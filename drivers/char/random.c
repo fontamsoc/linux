@@ -1287,6 +1287,7 @@ int random_online_cpu(unsigned int cpu)
 }
 #endif
 
+#if 0
 static unsigned long get_reg(struct fast_pool *f, struct pt_regs *regs)
 {
 	unsigned long *ptr = (unsigned long *)regs;
@@ -1301,6 +1302,7 @@ static unsigned long get_reg(struct fast_pool *f, struct pt_regs *regs)
 	WRITE_ONCE(f->reg_idx, idx);
 	return *ptr;
 }
+#endif
 
 static void mix_interrupt_randomness(struct work_struct *work)
 {
@@ -1356,7 +1358,7 @@ void add_interrupt_randomness(int irq)
 	} irq_data;
 
 	if (cycles == 0)
-		cycles = get_reg(fast_pool, regs);
+		cycles = random_get_entropy();
 
 	if (sizeof(unsigned long) == 8) {
 		irq_data.u64[0] = cycles ^ rol64(now, 32) ^ irq;
@@ -1365,7 +1367,7 @@ void add_interrupt_randomness(int irq)
 		irq_data.u32[0] = cycles ^ irq;
 		irq_data.u32[1] = now;
 		irq_data.u32[2] = regs ? instruction_pointer(regs) : _RET_IP_;
-		irq_data.u32[3] = get_reg(fast_pool, regs);
+		irq_data.u32[3] = random_get_entropy();
 	}
 
 	fast_mix(fast_pool->pool, irq_data.longs);
