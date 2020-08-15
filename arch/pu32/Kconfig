@@ -1,0 +1,119 @@
+config PU32
+	def_bool y
+	select PRINTK_TIME
+	select HAVE_DEBUG_KMEMLEAK
+	select HAVE_DEBUG_BUGVERBOSE
+	select ARCH_32BIT_OFF_T
+	select GENERIC_ATOMIC64
+	select GENERIC_LIB_ASHLDI3
+	select GENERIC_LIB_ASHRDI3
+	select GENERIC_LIB_LSHRDI3
+	select ARCH_USE_QUEUED_RWLOCKS
+	select ARCH_USE_QUEUED_SPINLOCKS
+	select HAVE_FUTEX_CMPXCHG if FUTEX
+	select GENERIC_IOMAP
+	select UACCESS_MEMCPY
+	select GENERIC_CLOCKEVENTS
+	select GENERIC_SCHED_CLOCK
+	select GENERIC_IRQ_SHOW
+	select BUILDTIME_TABLE_SORT
+	#select GENERIC_CPU_DEVICES
+	#select GENERIC_SMP_IDLE_THREAD
+
+#config SMP
+#	def_bool y
+
+config NR_CPUS
+	int "Maximum number of CPUs"
+	range 2 128
+	depends on SMP
+	default "2"
+
+config HOTPLUG_CPU
+	bool "Support for hot-pluggable CPUs"
+	depends on SMP
+	default y
+	help
+	  Say Y here to experiment with turning CPUs off and on.
+	  CPUs can be controlled through /sys/devices/system/cpu/cpu#.
+	  Say N if you want to disable CPU hotplug.
+
+config MMU
+	def_bool y
+
+config FPU
+	def_bool n # Disable all floating-point related procedure in the kernel.
+
+config HZ
+        int
+        default 100
+
+# TODO: Must be kept 0 until there is a way to guarantee
+# that kernel stacks are naturally aligned; otherwise checks
+# such as (sp & ~(THREAD_SIZE-1)) will fail to compute
+# the start of the stack.
+config KERNEL_STACK_ORDER
+	int "Kernel stack size order"
+	default 0
+	help
+	  This option determines the size of kernel stacks.
+	  They will be (1 << order) pages.
+
+config GENERIC_HWEIGHT
+	def_bool y
+
+config GENERIC_CSUM
+	def_bool y
+
+config STACKTRACE_SUPPORT
+	def_bool y
+
+config HW_RANDOM
+	default n
+
+config ARCH_RANDOM
+	def_bool y
+
+config RANDOM_TRUST_CPU
+	def_bool y
+
+config HWMON
+	default n
+
+config SSB_POSSIBLE
+	def_bool n
+
+config BCMA_POSSIBLE
+	def_bool n
+
+config IOMMU_SUPPORT
+	def_bool n
+
+config HID
+	default n
+
+config INPUT_KEYBOARD
+	def_bool n
+
+config INPUT_MOUSE
+	def_bool n
+
+config SECURITY
+	def_bool n
+
+config USB_OHCI_LITTLE_ENDIAN
+	def_bool n
+
+config USB_SUPPORT
+	def_bool n
+
+config LCD_CLASS_DEVICE
+	default n
+
+config EARLY_PRINTK
+	def_bool y
+
+config PU32_DEBUG
+	def_bool y
+
+source "arch/pu32/drivers/Kconfig"
