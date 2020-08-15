@@ -64,6 +64,10 @@
 #define EM_LOONGARCH	258
 #endif
 
+#ifndef EM_PU32
+#define EM_PU32		0xdeed
+#endif
+
 static uint32_t (*r)(const uint32_t *);
 static uint16_t (*r2)(const uint16_t *);
 static uint64_t (*r8)(const uint64_t *);
@@ -320,6 +324,7 @@ static int do_file(char const *const fname, void *addr)
 	case EM_LOONGARCH:
 	case EM_MICROBLAZE:
 	case EM_MIPS:
+	case EM_PU32:
 	case EM_XTENSA:
 		break;
 	default:

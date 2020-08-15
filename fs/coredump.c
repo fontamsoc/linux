@@ -510,6 +510,14 @@ static int umh_pipe_setup(struct subprocess_info *info, struct cred *new)
 
 void do_coredump(const kernel_siginfo_t *siginfo)
 {
+	#if defined(CONFIG_PU32_DEBUG)
+	unsigned long flags;
+	raw_local_irq_save(flags);
+	pr_notice("CPU: %d PID: %d Comm: %s\n", (int)raw_smp_processor_id(), current->pid, current->comm);
+	void show_stack (struct task_struct *tsk, unsigned long *sp, const char *loglvl);
+	show_stack (current, NULL, KERN_NOTICE);
+	raw_local_irq_restore(flags);
+	#endif
 	struct core_state core_state;
 	struct core_name cn;
 	struct mm_struct *mm = current->mm;
