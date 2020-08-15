@@ -1491,7 +1491,7 @@ static inline void mark_readonly(void)
 #else
 static inline void mark_readonly(void)
 {
-	pr_warn("This architecture does not have kernel memory protection.\n");
+	//pr_warn("This architecture does not have kernel memory protection.\n");
 }
 #endif
 
