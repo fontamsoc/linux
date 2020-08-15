@@ -1,0 +1,27 @@
+
+KBUILD_CFLAGS += -ffixed-%10
+#KBUILD_CFLAGS += -pipe
+KBUILD_CFLAGS += -Og -g3 -mzpoprp -save-temps -fverbose-asm -DPU32_DEBUG_disable_check_copy_size
+KBUILD_CFLAGS += -fno-builtin -Werror=implicit-function-declaration -fno-trampolines -Wno-declaration-after-statement
+KBUILD_AFLAGS += $(KBUILD_CFLAGS)
+
+head-y := arch/pu32/kernel/head.o
+
+core-y += arch/pu32/kernel/
+core-y += arch/pu32/mm/
+
+libs-y += arch/pu32/lib/
+
+drivers-y += arch/pu32/drivers/
+
+boot := arch/pu32/boot
+
+vmlinux.bin: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
+
+archclean:
+	$(Q)$(MAKE) $(clean)=$(boot)
+
+define archhelp
+	echo '  vmlinux.bin	- Binary kernel image (arch/$(ARCH)/boot/vmlinux.bin)'
+endef
