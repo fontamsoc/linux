@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# (c) William Fonkou Tambe
+
+menu "PU32 Device Drivers"
+
+source "arch/pu32/drivers/pu32hdd/Kconfig"
+source "arch/pu32/drivers/pu32gpio/Kconfig"
+source "arch/pu32/drivers/pu32fbdev/Kconfig"
+
+endmenu

@@ -134,6 +134,8 @@
 #define FB_ACCEL_NEOMAGIC_NM2380 98	/* NeoMagic NM2380              */
 #define FB_ACCEL_PXA3XX		 99	/* PXA3xx			*/
 
+#define FB_ACCEL_FONTAM_FBDEV   0x70    /* FonTam FrameBuffer Device    */
+
 #define FB_ACCEL_SAVAGE4        0x80	/* S3 Savage4                   */
 #define FB_ACCEL_SAVAGE3D       0x81	/* S3 Savage3D                  */
 #define FB_ACCEL_SAVAGE3D_MV    0x82	/* S3 Savage3D-MV               */
