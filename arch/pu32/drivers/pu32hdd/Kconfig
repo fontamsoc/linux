@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# (c) William Fonkou Tambe
+
+config PU32HDD
+	tristate "PU32 HDD Block Device Driver"
+	depends on BLK_DEV
+	help
+	  Support for the PU32 hard-disk-drive.
+
+	  To compile this driver as a module, choose M here,
+	  the module will be called pu32hdd.
