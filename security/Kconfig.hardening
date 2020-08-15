@@ -20,7 +20,7 @@ config GCC_PLUGIN_STRUCTLEAK
 menu "Memory initialization"
 
 config CC_HAS_AUTO_VAR_INIT_PATTERN
-	def_bool $(cc-option,-ftrivial-auto-var-init=pattern)
+	bool
 
 config CC_HAS_AUTO_VAR_INIT_ZERO_BARE
 	def_bool $(cc-option,-ftrivial-auto-var-init=zero)
@@ -32,13 +32,10 @@ config CC_HAS_AUTO_VAR_INIT_ZERO_ENABLER
 	depends on !CC_HAS_AUTO_VAR_INIT_ZERO_BARE
 
 config CC_HAS_AUTO_VAR_INIT_ZERO
-	def_bool CC_HAS_AUTO_VAR_INIT_ZERO_BARE || CC_HAS_AUTO_VAR_INIT_ZERO_ENABLER
+	bool
 
 choice
 	prompt "Initialize kernel stack variables at function entry"
-	default GCC_PLUGIN_STRUCTLEAK_BYREF_ALL if COMPILE_TEST && GCC_PLUGINS
-	default INIT_STACK_ALL_PATTERN if COMPILE_TEST && CC_HAS_AUTO_VAR_INIT_PATTERN
-	default INIT_STACK_ALL_ZERO if CC_HAS_AUTO_VAR_INIT_ZERO
 	default INIT_STACK_NONE
 	help
 	  This option enables initialization of stack variables at
@@ -256,7 +253,7 @@ config INIT_ON_FREE_DEFAULT_ON
 	  synthetic workloads have measured as high as 8%.
 
 config CC_HAS_ZERO_CALL_USED_REGS
-	def_bool $(cc-option,-fzero-call-used-regs=used-gpr)
+	bool
 
 config ZERO_CALL_USED_REGS
 	bool "Enable register zeroing on function exit"
