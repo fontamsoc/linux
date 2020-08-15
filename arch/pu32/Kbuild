@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# (c) William Fonkou Tambe
+
+obj-y += kernel/
+obj-y += mm/
+
+# for cleaning
+subdir- += boot
