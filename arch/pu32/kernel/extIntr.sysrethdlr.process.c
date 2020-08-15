@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// (c) William Fonkou Tambe
+
+// Acknowledge interrupt and return its number.
+// Must be very simple as it gets called from _inc_cpu_up_arg()
+// which uses a very small stack.
+unsigned long pu32_irq_ack (unsigned long en) {
+	unsigned long irqsrc;
+	if (pu32_ishw) {
+		if ((irqsrc = hwdrvintctrl_ack(raw_smp_processor_id(), en)) == -2) {
+			irqsrc = -1; // Should be an invalid interrupt number.
+			goto skip_irq;
+		}
+	} else if (pu32sysread (PU32_BIOS_FD_INTCTRLDEV, &irqsrc, sizeof(unsigned long)) != sizeof(unsigned long)) {
+		irqsrc = -1; // Should be an invalid interrupt number.
+		goto skip_irq;
+	}
+	if (irqsrc == -1)
+		irqsrc = PU32_IPI_IRQ;
+	skip_irq:;
+	return irqsrc;
+}
+
+static void pu32sysrethdlr_extIntr (unsigned long sysopcode) {
+	#ifdef CONFIG_SMP
+	if (!cpu_online(raw_smp_processor_id())) {
+		pu32_irq_ack(0);
+		kfree((void *)pu32_kernelmode_stack[raw_smp_processor_id()]);
+		asm volatile ("j %0\n" :: "r"(PARKPU_ADDR) : "memory");
+		// It should never reach here.
+		BUG();
+	}
+	#endif
+
+	struct thread_info *ti = current_thread_info();
+	struct task_struct *tsk = ti->task;
+
+	#if defined(CONFIG_PU32_DEBUG)
+	if (pu32irqflags[raw_smp_processor_id()] == ARCH_IRQ_DISABLED) {
+		pu32hang ("pu32ExtIntr: unexpected interrupt !!!\n");
+		return;
+		// pu32hang() will infinite-loop;
+		// so `return` will not be executed, but
+		// it is left in place for completeness.
+
+	}
+	#endif
+
+	unsigned long irqsrc = pu32_irq_ack(1);
+	if (irqsrc != -1) {
+		do_IRQ(irqsrc);
+	}
+
+	if (ti->preempt_count == PREEMPT_ENABLED && (ti->flags&_TIF_WORK_MASK)) {
+
+		save_pu32umode_regs(ti, PU32_PT_REGS_WHICH_ALL, pu32ExtIntr, sysopcode);
+
+		unsigned long hwflags = pu32hwflags[raw_smp_processor_id()];
+		hwflags &= ~PU32_FLAGS_USERSPACE;
+		hwflags |= PU32_FLAGS_KERNELSPACE;
+		pu32hwflags[raw_smp_processor_id()] = hwflags;
+
+		asm volatile ("setugpr %%tp, %0\n" :: "r"(ti) : "memory");
+		asm volatile ("setugpr %%sp, %0\n" :: "r"(ti->ksp) : "memory");
+		//asm volatile ("setugpr %%1, %0\n" :: "r"() : "memory");
+		//asm volatile ("setugpr %%rp, %0\n" :: "r"() : "memory");
+		asm volatile ("setuip %0\n" :: "r"(ret_from_exception) : "memory");
+		struct mm_struct *mm = tsk->active_mm;
+		asm volatile (
+			"cpy %%sr, %1\n"
+			"setasid %0\n" ::
+			"r"(mm->context),
+			"r"(mm->pgd) :
+			"memory");
+		asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
+	}
+}
