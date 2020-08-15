@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# (c) William Fonkou Tambe
+
+config PU32GPIO
+	tristate "PU32 GPIO Device Driver"
+	help
+	  Support for PU32 GPIO device.
+
+	  To compile this driver as a module, choose M here,
+	  the module will be called pu32gpio.
