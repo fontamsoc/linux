@@ -480,7 +480,7 @@ EXPORT_SYMBOL_GPL(sprint_symbol_no_offset);
  */
 int sprint_backtrace(char *buffer, unsigned long address)
 {
-	return __sprint_symbol(buffer, address, -1, 1);
+	return sprint_symbol(buffer, address);
 }
 
 /* To avoid using get_symbol_offset for every symbol, we carry prefix along. */
