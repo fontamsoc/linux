@@ -56,19 +56,17 @@ static int pu32_timer_set_state_shutdown (
 	return 0;
 }
 
-// TODO: Determine which header file this is supposed to go to,
-// TODO: and make use of it in the smp_init() function for each core.
 void pu32_clockevent_init (void) {
 
 	struct clock_event_device *e =
-		kzalloc(sizeof(*e), GFP_KERNEL);
+		kzalloc(sizeof(*e), GFP_ATOMIC);
 
 	unsigned cpu = raw_smp_processor_id();
 
 	clkevtdevs[cpu] = e;
 
 	const unsigned strsz = 10;
-	char *s = kzalloc(strsz, GFP_KERNEL);
+	char *s = kzalloc(strsz, GFP_ATOMIC);
 	snprintf(s, strsz, "timer%u", cpu);
 
 	e->name = s;

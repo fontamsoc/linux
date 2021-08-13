@@ -46,6 +46,9 @@ void __init init_IRQ (void) {
 		irq_set_chip(i, &dummy_irq_chip);
 		irq_set_handler(i, handle_simple_irq);
 	}
+	#ifdef CONFIG_SMP
+        ipi_init();
+	#endif
 }
 
 void do_IRQ (unsigned long irq) {

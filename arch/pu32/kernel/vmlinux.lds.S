@@ -16,15 +16,17 @@ ENTRY(_start)
 jiffies = jiffies_64;
 
 SECTIONS {
-	/* Reserved memory */
-	. = (PAGE_SIZE + PU32_BIOS_RESERVED_MEM);
+
+	. = KERNELADDR;
 
 	_stext = .;
-	__init_begin = .;
 	HEAD_TEXT_SECTION
 	INIT_TEXT_SECTION(PAGE_SIZE)
 	INIT_DATA_SECTION(PAGE_SIZE)
-	. = ALIGN(PAGE_SIZE);
+	/* For SMP support _inc_cpu_up_arg() _start_smp(),
+	   for now we always want to keep __init __INIT code. */
+	__init_begin = .;
+	/* . = ALIGN(PAGE_SIZE); */
 	__init_end = .;
 
 	_text = .;

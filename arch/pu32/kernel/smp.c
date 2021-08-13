@@ -1,298 +1,287 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // (c) William Fonkou Tambe
 
-// TODO: Template from csky ...
-
-#include <linux/module.h>
+//#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
-#include <linux/kernel_stat.h>
+//#include <linux/kernel_stat.h>
 #include <linux/notifier.h>
 #include <linux/cpu.h>
+#include <linux/interrupt.h>
 #include <linux/percpu.h>
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/irq.h>
-#include <linux/irqdomain.h>
 #include <linux/sched/task_stack.h>
 #include <linux/sched/mm.h>
 #include <linux/sched/hotplug.h>
 
 #include <asm/irq.h>
-#include <asm/traps.h>
+//#include <asm/traps.h>
 #include <asm/sections.h>
-#include <asm/mmu_context.h>
-#include <asm/pgalloc.h>
+//#include <asm/mmu_context.h>
+//#include <asm/pgalloc.h>
 
-// Map logical to physical.
-unsigned long __cpu_logical_map[NR_CPUS] = {
-	// All entries are invalid by default.
-	[0 ... NR_CPUS - 1] = INVALID_HWCPUID,
-};
-EXPORT_SYMBOL(__cpu_logical_map);
-
-#if 0
-struct ipi_data_struct {
-	unsigned long bits ____cacheline_aligned;
-};
-static DEFINE_PER_CPU(struct ipi_data_struct, ipi_data);
-
-enum ipi_message_type {
-	IPI_EMPTY,
-	IPI_RESCHEDULE,
-	IPI_CALL_FUNC,
-	IPI_MAX
-};
-
-static irqreturn_t handle_ipi(int irq, void *dev)
-{
-	while (true) {
-		unsigned long ops;
-
-		ops = xchg(&this_cpu_ptr(&ipi_data)->bits, 0);
-		if (ops == 0)
-			return IRQ_HANDLED;
-
-		if (ops & (1 << IPI_RESCHEDULE))
-			scheduler_ipi();
-
-		if (ops & (1 << IPI_CALL_FUNC))
-			generic_smp_call_function_interrupt();
-
-		BUG_ON((ops >> IPI_MAX) != 0);
-	}
-
-	return IRQ_HANDLED;
-}
-
-static void (*send_arch_ipi)(const struct cpumask *mask);
-
-static int ipi_irq;
-void __init set_send_ipi(void (*func)(const struct cpumask *mask), int irq)
-{
-	if (send_arch_ipi)
-		return;
-
-	send_arch_ipi = func;
-	ipi_irq = irq;
-}
-
-static void
-send_ipi_message(const struct cpumask *to_whom, enum ipi_message_type operation)
-{
-	int i;
-
-	for_each_cpu(i, to_whom)
-		set_bit(operation, &per_cpu_ptr(&ipi_data, i)->bits);
-
-	smp_mb();
-	send_arch_ipi(to_whom);
-}
-
-void arch_send_call_function_ipi_mask(struct cpumask *mask)
-{
-	send_ipi_message(mask, IPI_CALL_FUNC);
-}
-
-void arch_send_call_function_single_ipi(int cpu)
-{
-	send_ipi_message(cpumask_of(cpu), IPI_CALL_FUNC);
-}
-
-static void ipi_stop(void *unused)
-{
-	while (1);
-}
-
-void smp_send_stop(void)
-{
-	on_each_cpu(ipi_stop, NULL, 1);
-}
-
-void smp_send_reschedule(int cpu)
-{
-	send_ipi_message(cpumask_of(cpu), IPI_RESCHEDULE);
-}
-
-static int ipi_dummy_dev;
-
-void __init setup_smp_ipi(void)
-{
-	int rc;
-
-	if (ipi_irq == 0)
-		panic("%s IRQ mapping failed\n", __func__);
-
-	rc = request_percpu_irq(ipi_irq, handle_ipi, "IPI Interrupt",
-				&ipi_dummy_dev);
-	if (rc)
-		panic("%s IRQ request failed\n", __func__);
-
-	enable_percpu_irq(ipi_irq, 0);
-}
-#endif
+#include <hwdrvintctrl.h>
 
 void __init smp_prepare_boot_cpu (void) {}
 void __init smp_prepare_cpus (unsigned int max_cpus) {}
 
-/* TODO: Make use of:
-unsigned long coreid;
-asm volatile ("getcoreid %0\n" : "=r"(coreid));
-if (coreid >= NR_CPUS) // TODO: Check to be done by cpu bring-up code ...
-	panic("coreid:%u >= NR_CPUS(%u)\n", (unsigned)coreid, NR_CPUS); */
+volatile unsigned int cpu_up_arg;
+
+extern unsigned long pu32_ishw;
 
 void __init setup_smp (void) {
-	// Keep track of the total number
-	// of threads accross all cores.
-	// There is always at least 1 thread
-	// which is the booting the thread.
-	unsigned cpu = 1;
 
-	unsigned corecnt =; // TODO:
+	cpu_up_arg = 1;
 
-	for (unsigned i = 0; i < corecnt; ++i) {
-		// TODO: Retrieve number of threads for this core.
-		// TODO: It could be a setup where there is a different
-		// TODO: number of threads in each core.
-		unsigned threadcnt =; // TODO ...
-
-		// (j = !i) allow to skip the booting thread.
-		for (unsigned j = !i; j < threadcnt; ++j) {
-
-			if (cpu >= NR_CPUS)
-				break;
-
-			// TODO: Figure how Linux assign threads to cores ...
-			// TODO: For that, use cpu_logical_map just like in tsar ...
-			// TODO: ie: for_each_possible_cpu(cpu) set_cpu_numa_node(cpu, cpu_node_map[cpu]);
-			// TODO: Depend also on tsar cpu_setup_nodes() in numa.c ...
-
-			set_cpu_possible(cpu, true);
-			set_cpu_present(cpu, true);
-
-			++cpu;
+	extern char _inc_cpu_up_arg[];
+	unsigned long _inc_cpu_up_arg_raddr = ((unsigned long)_inc_cpu_up_arg - (PARKPU_RLI16IMM_ADDR + 2));
+	while (1) {
+		unsigned long old_cpu_up_arg = cpu_up_arg;
+		BUG_ON(_inc_cpu_up_arg_raddr>>16); // Insure address fit in 16bits.
+		asm volatile ("ldst16 %0, %1" /* does memory fencing as well */
+			: "+r" ((unsigned long){_inc_cpu_up_arg_raddr})
+			: "r"  (PARKPU_RLI16IMM_ADDR));
+		unsigned long irqdst;
+		if (pu32_ishw)
+			irqdst = hwdrvintctrl_int(cpu_up_arg);
+		else {
+			// Discard any data currently buffered in PU32_BIOS_FD_INTCTRLDEV.
+			while (pu32sysread (PU32_BIOS_FD_INTCTRLDEV, &irqdst, sizeof(unsigned long)));
+			// Send IPI to cpu_up_arg.
+			pu32syswrite (PU32_BIOS_FD_INTCTRLDEV, (void *)&cpu_up_arg, sizeof(unsigned long));
+			// Read IPI request response.
+			pu32sysread (PU32_BIOS_FD_INTCTRLDEV, (void *)&irqdst, sizeof(unsigned long));
 		}
+		if (irqdst == -1)
+			break;
+		unsigned long timeout;
+		for (	timeout = msecs_to_jiffies(10000);
+			timeout && cpu_up_arg == old_cpu_up_arg;
+			--timeout);
+		if (cpu_up_arg != old_cpu_up_arg)
+			continue;
+		pr_crit("CPU%u failed to start\n", cpu_up_arg);
+		break;
+	}
+
+	if (cpu_up_arg > nr_cpu_ids) {
+		pr_warn("Total number of cpus [%d] > [%d]\n",
+			cpu_up_arg, nr_cpu_ids);
+		cpu_up_arg = nr_cpu_ids;
+	}
+
+	unsigned int cpu;
+	for (cpu = 1; cpu < cpu_up_arg; ++cpu) {
+		set_cpu_possible(cpu, true);
+		set_cpu_present(cpu, true);
 	}
 }
 
+static DECLARE_COMPLETION(cpu_up_flag);
 
+int __cpu_up (unsigned int cpu, struct task_struct *tidle) {
 
+	struct thread_info *ti = task_thread_info(tidle);
+	ti->last_cpu = ti->cpu = cpu;
 
-extern void _start_smp_secondary(void);
+	cpu_up_arg = // Value to set in the cpu %sp.
+		// sizeof(struct pu32_pt_regs) accounts for the space
+		// used only if the thread ever become a user-thread.
+		((unsigned long)end_of_stack(tidle) - sizeof(struct pu32_pt_regs));
 
-volatile unsigned int secondary_stack;
+	extern char _start_smp[];
+	unsigned long _start_smp_raddr = ((unsigned long)_start_smp - (PARKPU_RLI16IMM_ADDR + 2));
+	BUG_ON(_start_smp_raddr>>16); // Insure address fit in 16bits.
+	asm volatile ("ldst16 %0, %1" /* does memory fencing as well */
+		: "+r" ((unsigned long){_start_smp_raddr})
+		: "r"  (PARKPU_RLI16IMM_ADDR));
 
-int __cpu_up (unsigned int cpu, struct task_struct *tidle)
-{
-	unsigned long mask = 1 << cpu;
-
-	secondary_stack =
-		(unsigned int) task_stack_page(tidle) + THREAD_SIZE - 8;
-
-	if (mask & mfcr("cr<29, 0>")) {
-		send_arch_ipi(cpumask_of(cpu));
-	} else {
-		/* Enable cpu in SMP reset ctrl reg */
-		mask |= mfcr("cr<29, 0>");
-		mtcr("cr<29, 0>", mask);
+	unsigned long irqdst;
+	if (pu32_ishw)
+		irqdst = hwdrvintctrl_int(cpu);
+	else {
+		// Discard any data currently buffered in PU32_BIOS_FD_INTCTRLDEV.
+		while (pu32sysread (PU32_BIOS_FD_INTCTRLDEV, &irqdst, sizeof(unsigned long)));
+		// Send IPI to cpu.
+		pu32syswrite (PU32_BIOS_FD_INTCTRLDEV, (void *)&cpu, sizeof(unsigned long));
+		// Read IPI request response.
+		pu32sysread (PU32_BIOS_FD_INTCTRLDEV, (void *)&irqdst, sizeof(unsigned long));
+	}
+	if (irqdst == -1) {
+		pr_crit("CPU%u failed to start\n", cpu);
+		return -EOPNOTSUPP;
 	}
 
-	/* Wait for the cpu online */
-	while (!cpu_online(cpu));
+	wait_for_completion_timeout(&cpu_up_flag, msecs_to_jiffies(10000));
 
-	secondary_stack = 0;
+	if (!cpu_online(cpu)) {
+		pr_crit("CPU%u startup timeout\n", cpu);
+		return -EIO;
+	}
 
 	return 0;
 }
 
-void __init smp_cpus_done(unsigned int max_cpus)
-{
-}
+void __init smp_cpus_done (unsigned int max_cpus) {}
 
-int setup_profiling_timer(unsigned int multiplier)
-{
+int setup_profiling_timer (unsigned int multiplier) {
 	return -EINVAL;
 }
 
-// TODO: Also implement pu32_start_thread() which
-// TODO: will be used as the starting point of threads.
+extern unsigned long pu32_TASK_UNMAPPED_BASE;
 
-// TODO: Write pu32_start_smp() in u16 field in BIOS.parkpu() at (KERNELADDR - (PARKPUSZ - 14)).
+void pu32ctxswitchhdlr (void);
+
+void c_setup (void);
+
 void pu32_start_smp (void) {
 
-	// TODO: set %tp ...
+	asm volatile ("setksl %0\n" :: "r"(pu32_TASK_UNMAPPED_BASE));
 
-	// TODO: Allocate the stack for the thread ...
-
-	c_setup();
+	struct thread_info *ti = pu32_get_thread_info(cpu_up_arg);
+	asm volatile ("cpy %%tp, %0" :: "r"(ti));
 
 	struct mm_struct *mm = &init_mm;
-	unsigned int cpu = raw_smp_processor_id();
-
-	local_flush_tlb_all();
-	write_mmu_pagemask(0);
-	TLBMISS_HANDLER_SETUP_PGD(swapper_pg_dir);
-	TLBMISS_HANDLER_SETUP_PGD_KERNEL(swapper_pg_dir);
-
-	asid_cache(raw_smp_processor_id()) = ASID_FIRST_VERSION;
-
-	enable_percpu_irq(ipi_irq, 0);
-
-	mmget(mm); // TODO: riscv do not use this here ...
+	mmget(mm);
 	mmgrab(mm);
 	current->active_mm = mm;
-	cpumask_set_cpu(cpu, mm_cpumask(mm));
+	cpumask_set_cpu(raw_smp_processor_id(), mm_cpumask(mm));
 
-	notify_cpu_starting(cpu);
-	set_cpu_online(cpu, true);
+	enable_percpu_irq(PU32_IPI_IRQ, 0);
 
-	pr_info("CPU%u Online: %s...\n", cpu, __func__);
+	notify_cpu_starting(raw_smp_processor_id());
+	c_setup();
+	set_cpu_online(raw_smp_processor_id(), true);
+	pr_info("CPU%u online\n", (unsigned int)raw_smp_processor_id());
+	complete(&cpu_up_flag);
 
-	local_irq_enable(); // TODO: Not needed ...
+	// Disable preemption before enabling interrupts, so we don't
+	// try to schedule a CPU that hasn't actually started yet.
 	preempt_disable();
+	void pu32_clockevent_init (void); pu32_clockevent_init();
+	pu32ctxswitchhdlr();
+	local_irq_enable();
 	cpu_startup_entry(CPUHP_AP_ONLINE_IDLE);
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
-int __cpu_disable(void)
-{
+struct ipi_data_struct {
+	unsigned long bits;
+};
+static struct ipi_data_struct ipi_data[NR_CPUS];
+
+enum ipi_msg_type {
+	IPI_EMPTY,
+	IPI_RESCHEDULE,
+	IPI_CALL_FUNC,
+	IPI_CPU_STOP,
+	IPI_MAX
+};
+
+extern unsigned long pu32_kernelmode_stack[NR_CPUS];
+
+static irqreturn_t handle_ipi (int irq, void *dev) {
+	while (true) {
+		unsigned long ops = xchg(&ipi_data[raw_smp_processor_id()].bits, 0);
+		if (ops == 0)
+			return IRQ_HANDLED;
+		if (ops & (1 << IPI_RESCHEDULE))
+			scheduler_ipi();
+		if (ops & (1 << IPI_CALL_FUNC))
+			generic_smp_call_function_interrupt();
+		if (ops & (1 << IPI_CPU_STOP)) {
+			set_cpu_online(raw_smp_processor_id(), false);
+			kfree((void *)pu32_kernelmode_stack[raw_smp_processor_id()]);
+			asm volatile ("j %0" :: "r"(PARKPU_ADDR));
+			// It should never reach here.
+			BUG();
+		}
+		BUG_ON((ops >> IPI_MAX) != 0);
+	}
+	return IRQ_HANDLED;
+}
+
+static void ipi_msg (const struct cpumask *mask, enum ipi_msg_type msg_id) {
+	unsigned int cpu;
+	for_each_cpu(cpu, mask)
+		__set_bit(msg_id, &ipi_data[raw_smp_processor_id()].bits);
+	smp_mb();
+	for_each_cpu(cpu, mask) {
+		unsigned long irqdst;
+		if (pu32_ishw)
+			irqdst = hwdrvintctrl_int(cpu);
+		else {
+			// Discard any data currently buffered in PU32_BIOS_FD_INTCTRLDEV.
+			while (pu32sysread (PU32_BIOS_FD_INTCTRLDEV, &irqdst, sizeof(unsigned long)));
+			// Send IPI to cpu.
+			pu32syswrite (PU32_BIOS_FD_INTCTRLDEV, (void *)&cpu, sizeof(unsigned long));
+			// Read IPI request response.
+			pu32sysread (PU32_BIOS_FD_INTCTRLDEV, (void *)&irqdst, sizeof(unsigned long));
+		}
+		if (irqdst == -1)
+			pr_crit("CPU%u ipi_msg failed\n", cpu);
+	}
+}
+
+void arch_send_call_function_ipi_mask (struct cpumask *mask) {
+	ipi_msg(mask, IPI_CALL_FUNC);
+}
+
+void arch_send_call_function_single_ipi (int cpu) {
+	ipi_msg(cpumask_of(cpu), IPI_CALL_FUNC);
+}
+
+void smp_send_reschedule (int cpu) {
+	ipi_msg(cpumask_of(cpu), IPI_RESCHEDULE);
+}
+
+void smp_send_stop (void) {
+	struct cpumask mask;
+	cpumask_copy(&mask, cpu_online_mask);
 	unsigned int cpu = raw_smp_processor_id();
+	cpumask_clear_cpu(cpu, &mask);
+	ipi_msg(&mask, IPI_CPU_STOP);
+}
 
+void ipi_init (void) {
+	int rc = request_irq (
+		PU32_IPI_IRQ, handle_ipi,
+		IRQF_PERCPU|IRQF_NOBALANCING, "IPI", &((unsigned long){0}));
+	if (rc)
+		panic("IPI IRQ request failed\n");
+	enable_percpu_irq(PU32_IPI_IRQ, 0);
+}
+
+#ifdef CONFIG_HOTPLUG_CPU
+
+int __cpu_disable (void) {
+	unsigned int cpu = raw_smp_processor_id();
 	set_cpu_online(cpu, false);
-
+	#ifdef CONFIG_GENERIC_IRQ_MIGRATION
 	irq_migrate_all_off_this_cpu();
-
+	#endif
 	clear_tasks_mm_cpumask(cpu);
-
 	return 0;
 }
 
-void __cpu_die(unsigned int cpu)
-{
+void __cpu_die (unsigned int cpu) {
 	if (!cpu_wait_death(cpu, 5)) {
-		pr_crit("CPU%u: shutdown failed\n", cpu);
+		pr_crit("CPU%u shutdown failed\n", cpu);
 		return;
 	}
-	pr_notice("CPU%u: shutdown\n", cpu);
+	pr_notice("CPU%u offline\n", cpu);
 }
 
-void arch_cpu_idle_dead(void)
-{
+void arch_cpu_idle_dead (void) {
 	idle_task_exit();
-
 	cpu_report_death();
-
-	while (!secondary_stack)
-		arch_cpu_idle();
-
-	local_irq_disable();
-
-	asm volatile(
-		"mov	sp, %0\n"
-		"mov	r8, %0\n"
-		"jmpi	pu32_start_secondary"
-		:: "r" (secondary_stack));
+	unsigned int cpu = raw_smp_processor_id();
+	ipi_msg(cpumask_of(cpu), IPI_CPU_STOP);
+	// It should never reach here.
+	BUG();
 }
-#endif
+
+#endif /* CONFIG_HOTPLUG_CPU */

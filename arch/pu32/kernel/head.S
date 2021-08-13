@@ -54,3 +54,31 @@ ENTRY(_start)
 	j %sr
 
 END(_start)
+
+#ifdef CONFIG_SMP
+
+ENTRY(_inc_cpu_up_arg)
+
+	rli %sr, cpu_up_arg
+	ld32 %1, %sr
+	inc8 %1, 1
+	ldst32 %1, %sr
+
+	li %sr, PARKPU_ADDR
+	j %sr
+
+END(_inc_cpu_up_arg)
+
+ENTRY(_start_smp)
+
+	rli %sr, cpu_up_arg
+	ld32 %sp, %sr
+
+	li %fp, 0
+
+	rli %sr, pu32_start_smp
+	j %sr
+
+END(_start_smp)
+
+#endif

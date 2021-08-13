@@ -4,25 +4,25 @@
 #ifndef __ASM_PU32_PTRACE_H
 #define __ASM_PU32_PTRACE_H
 
+#include <asm/percpu.h>
 #include <uapi/asm/ptrace.h>
 #include <asm/thread_info.h>
 #include <pu32.h>
 
+extern unsigned long pu32_kernelmode_stack[NR_CPUS];
+
 #define user_mode(regs) ({ \
-	extern unsigned long pu32_kernelmode_stack; \
 	unsigned long sp; asm volatile ("cpy %0, %%sp" : "=r"(sp)); \
-	(((sp & ~(THREAD_SIZE-1)) == pu32_kernelmode_stack) ? \
+	(((sp & ~(THREAD_SIZE-1)) == pu32_kernelmode_stack[raw_smp_processor_id()]) ? \
 		pu32_in_userspace(current_thread_info()) : \
 		pu32_ret_to_userspace(current_thread_info()));})
 #define user_stack_pointer(regs) ({ \
-	extern unsigned long pu32_kernelmode_stack; \
 	unsigned long sp; asm volatile ("cpy %0, %%sp" : "=r"(sp)); \
-	(((sp & ~(THREAD_SIZE-1)) == pu32_kernelmode_stack) ? \
+	(((sp & ~(THREAD_SIZE-1)) == pu32_kernelmode_stack[raw_smp_processor_id()]) ? \
 		sp : (regs)->sp);})
 #define instruction_pointer(regs) ({ \
-	extern unsigned long pu32_kernelmode_stack; \
 	unsigned long sp; asm volatile ("cpy %0, %%sp" : "=r"(sp)); \
-	(((sp & ~(THREAD_SIZE-1)) == pu32_kernelmode_stack) ? \
+	(((sp & ~(THREAD_SIZE-1)) == pu32_kernelmode_stack[raw_smp_processor_id()]) ? \
 		_RET_IP_ : (regs)->pc);})
 
 typedef enum {

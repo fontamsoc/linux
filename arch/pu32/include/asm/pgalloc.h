@@ -20,7 +20,7 @@ static inline void pmd_populate (
 
 static inline pgd_t *pgd_alloc (
 	struct mm_struct *mm) {
-	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
+	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_ATOMIC);
 	if (pgd != NULL) {
 		pgd[0] = swapper_pg_dir[0];
 		extern char __pu32tramp_start[], __pu32tramp_end[];

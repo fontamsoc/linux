@@ -9,12 +9,12 @@
 #define THREAD_SIZE_ORDER CONFIG_KERNEL_STACK_ORDER
 #define THREAD_SIZE ((1 << CONFIG_KERNEL_STACK_ORDER) * PAGE_SIZE)
 
+#include <pu32.h>
+
 #ifndef __ASSEMBLY__
 
 #include <asm/ptrace.h>
 #include <asm/mmu.h>
-
-#include <pu32.h>
 
 typedef struct {
         unsigned long seg;
@@ -24,6 +24,7 @@ struct thread_info {
 	struct task_struct	*task;
 	unsigned long		flags;
 	unsigned int		cpu;
+	unsigned int		last_cpu;
 	int			preempt_count;
 	mm_segment_t		addr_limit;
 	unsigned long		in_fault; // Tell whether the thread is executing do_fault().
@@ -61,6 +62,7 @@ static inline unsigned long pu32_in_userspace (struct thread_info *ti) {
 	struct thread_info *orig_ti = task_thread_info(orig);			\
 	tsk_ti->flags = orig_ti->flags;						\
 	tsk_ti->cpu = orig_ti->cpu;						\
+	tsk_ti->last_cpu = orig_ti->cpu;					\
 	tsk_ti->preempt_count = orig_ti->preempt_count;				\
 	tsk_ti->addr_limit = orig_ti->addr_limit;				\
 	tsk_ti->in_fault = orig_ti->in_fault;					\
@@ -80,6 +82,7 @@ static inline unsigned long pu32_in_userspace (struct thread_info *ti) {
 #define INIT_THREAD_INFO(tsk) {				\
 	.task		= &tsk,				\
 	.cpu		= 0,				\
+	.last_cpu	= 0,				\
 	.preempt_count	= INIT_PREEMPT_COUNT,		\
 	.addr_limit	= KERNEL_DS,			\
 	.in_fault	= 0,				\

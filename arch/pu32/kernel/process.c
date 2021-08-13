@@ -14,6 +14,7 @@
 #include <asm/syscall.h>
 #include <asm/tlbflush.h>
 #include <asm/irq_regs.h>
+#include <asm/irq.h>
 
 #include <pu32.h>
 
@@ -179,7 +180,7 @@ extern unsigned long loops_per_jiffy;
 extern unsigned long pu32irqflags[NR_CPUS];
 
 // Get set to the start of the pu32-kernelmode stack.
-unsigned long pu32_kernelmode_stack = 0;
+unsigned long pu32_kernelmode_stack[NR_CPUS];
 
 #include <hwdrvintctrl.h>
 
@@ -216,12 +217,13 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 	   it does not corrupt the stack of the task running in pu32-usermode.
 	   In other words, we are setting up the stack to be used in pu32-kernelmode. */ {
 		unsigned long osp; asm volatile ("cpy %0, %%sp" : "=r"(osp));
-		pu32_kernelmode_stack = (unsigned long)kmalloc(THREAD_SIZE, GFP_KERNEL);
+		unsigned long kmode_stack = (unsigned long)kmalloc(THREAD_SIZE, GFP_ATOMIC);
+		pu32_kernelmode_stack[raw_smp_processor_id()] = kmode_stack;
 		unsigned long pu32_stack_top_osp = pu32_stack_top(osp);
 		unsigned long o = (osp - pu32_stack_top_osp);
-		unsigned long nsp = pu32_kernelmode_stack + o;
+		unsigned long nsp = kmode_stack + o;
 		memcpy((void *)nsp, (void *)osp, (THREAD_SIZE - o));
-		pu32_get_thread_info(nsp)->ksp -= (pu32_stack_top_osp - pu32_kernelmode_stack);
+		pu32_get_thread_info(nsp)->ksp -= (pu32_stack_top_osp - kmode_stack);
 		asm volatile ("cpy %%sp, %0" :: "r"(nsp));
 	}
 
@@ -379,6 +381,13 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 									PU32_FLAGS_KERNELSPACE : next_ti->pu32flags) |
 										((pu32irqflags[raw_smp_processor_id()] == ARCH_IRQ_DISABLED) ?
 											PU32_FLAGS_disIntr : 0));
+
+								#ifdef CONFIG_SMP
+								if (next_ti->last_cpu != raw_smp_processor_id()) {
+									local_flush_tlb_mm(next_mm);
+									next_ti->last_cpu = raw_smp_processor_id();
+								}
+								#endif
 
 								asm volatile (
 									"cpy %%sr, %4\n"
@@ -622,6 +631,9 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 					ret = sizeof(unsigned long);
 				} else
 					ret = pu32sysread (PU32_BIOS_FD_INTCTRLDEV, &irqsrc, sizeof(unsigned long));
+
+				if (irqsrc == -1)
+					irqsrc = PU32_IPI_IRQ;
 
 				if (ret == sizeof(unsigned long))
 					do_IRQ(irqsrc);

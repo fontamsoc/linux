@@ -8,6 +8,13 @@
 // Must match corresponding constant in the bootloader source-code.
 #define PU32_BIOS_RESERVED_MEM (3*PAGE_SIZE)
 
+#define KERNELADDR (PAGE_SIZE + PU32_BIOS_RESERVED_MEM)
+
+#define PARKPUSZ 24
+
+#define PARKPU_ADDR          (KERNELADDR - PARKPUSZ)
+#define PARKPU_RLI16IMM_ADDR (PARKPU_ADDR + 14)
+
 #ifndef __ASSEMBLY__
 
 #include <linux/kernel.h>

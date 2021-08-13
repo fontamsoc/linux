@@ -16,12 +16,20 @@
 
 #include <pu32.h>
 
+#if defined(CONFIG_NODES_SHIFT) && (CONFIG_NR_CPUS != (1<<CONFIG_NODES_SHIFT))
+#error NODES_SHIFT is invalid
+#endif
+
 unsigned long pu32_mem_start;
 unsigned long pu32_mem_end;
 unsigned long pu32_mem_end_high;
 unsigned long pu32_TASK_UNMAPPED_BASE;
 
 unsigned long pu32_ishw = 0;
+
+#ifdef CONFIG_SMP
+void __init setup_smp (void);
+#endif
 
 void __init setup_arch (char **cmdline_p) {
 
@@ -61,6 +69,10 @@ void __init setup_arch (char **cmdline_p) {
 			(unsigned)TASK_UNMAPPED_BASE, (unsigned)TASK_SIZE);
 
 	pr_info("Virt. mem: %ldMB\n", (TASK_SIZE - TASK_UNMAPPED_BASE)/1024/1024);
+
+	#ifdef CONFIG_SMP
+	setup_smp();
+	#endif
 }
 
 void __init trap_init (void) {}

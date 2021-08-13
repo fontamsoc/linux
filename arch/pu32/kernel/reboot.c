@@ -2,12 +2,15 @@
 // (c) William Fonkou Tambe
 
 #include <linux/reboot.h>
+#include <linux/smp.h>
 
 #include <asm/syscall.h>
 
 void machine_restart (char *cmd) {
 	local_irq_disable();
-	// TODO: smp_send_stop();
+	#ifdef CONFIG_SMP
+	smp_send_stop();
+	#endif
 	do_kernel_restart(cmd);
 	asm volatile ("li8 %%1, 1; li %%sr, %0; syscall\n" :: "i"(__NR_exit));
 	pr_emerg("machine_restart() failed -- halting system\n");
@@ -16,7 +19,9 @@ void machine_restart (char *cmd) {
 
 void machine_power_off (void) {
 	local_irq_disable();
-	// TODO: smp_send_stop();
+	#ifdef CONFIG_SMP
+	smp_send_stop();
+	#endif
 	asm volatile ("li8 %%1, 0; li %%sr, %0; syscall\n" :: "i"(__NR_exit));
 	pr_emerg("machine_power_off() failed -- halting system\n");
 	while(1);

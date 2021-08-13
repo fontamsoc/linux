@@ -18,11 +18,11 @@ static unsigned long last_mmu_context = PU32_NO_CONTEXT;
 
 unsigned long get_mmu_context (void) {
 
-	#ifdef CONFIG_SMP
-	spin_lock(&mmu_context_lock);
-	#else
 	unsigned long flags;
 	raw_local_irq_save(flags);
+
+	#ifdef CONFIG_SMP
+	spin_lock(&mmu_context_lock);
 	#endif
 
 	unsigned long context = find_next_zero_bit (mmu_context, PU32_NR_ASIDS, last_mmu_context+1);
@@ -35,9 +35,9 @@ unsigned long get_mmu_context (void) {
 
 	#ifdef CONFIG_SMP
 	spin_unlock(&mmu_context_lock);
-	#else
-	raw_local_irq_restore(flags);
 	#endif
+
+	raw_local_irq_restore(flags);
 
 	return context;
 }
@@ -48,20 +48,20 @@ void put_mmu_context (unsigned long context) {
 	BUG_ON (context == PU32_NO_CONTEXT);
 	#endif
 
-	#ifdef CONFIG_SMP
-	spin_lock(&mmu_context_lock);
-	#else
 	unsigned long flags;
 	raw_local_irq_save(flags);
+
+	#ifdef CONFIG_SMP
+	spin_lock(&mmu_context_lock);
 	#endif
 
 	__clear_bit (context, mmu_context);
 
 	#ifdef CONFIG_SMP
 	spin_unlock(&mmu_context_lock);
-	#else
-	raw_local_irq_restore(flags);
 	#endif
+
+	raw_local_irq_restore(flags);
 }
 
 void __init init_mmu_context (void) {

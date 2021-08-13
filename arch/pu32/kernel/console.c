@@ -26,11 +26,10 @@ static DEFINE_SPINLOCK(tty_console_lock);
 
 static void tty_console_write (
 	struct console *con, const char *s, unsigned n) {
-	#ifdef CONFIG_SMP
-	spin_lock(&tty_console_lock);
-	#else
 	unsigned long flags;
 	raw_local_irq_save(flags);
+	#ifdef CONFIG_SMP
+	spin_lock(&tty_console_lock);
 	#endif
 	unsigned long i;
 	if (pu32_ttys_irq != -1 && pu32_ishw) {
@@ -42,9 +41,8 @@ static void tty_console_write (
 	}
 	#ifdef CONFIG_SMP
 	spin_unlock(&tty_console_lock);
-	#else
-	raw_local_irq_restore(flags);
 	#endif
+	raw_local_irq_restore(flags);
 }
 
 static struct tty_driver *tty_console_driver;
