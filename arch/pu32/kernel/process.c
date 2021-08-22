@@ -166,7 +166,7 @@ unsigned long get_wchan (struct task_struct *tsk) {
 }
 
 void arch_cpu_idle (void) {
-	local_irq_enable();
+	raw_local_irq_enable();
 	asm volatile ("halt");
 }
 
