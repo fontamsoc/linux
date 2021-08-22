@@ -6,8 +6,8 @@
 
 #include <uapi/asm/unistd.h>
 
-#if (__NR_syscalls != 440)
-#error __NR_syscalls has changed; update binutils-sim glibc newlib
+#if (__NR_syscalls != 441)
+#error __NR_syscalls has changed; update binutils-sim fontamsoc-sw/bios; rebuild glibc
 #endif
 
 #ifndef __ASSEMBLY__
