@@ -214,7 +214,7 @@ static void do_signal (void) {
 void do_notify_resume (
 	unsigned long thread_info_flags) {
 
-	if (thread_info_flags&_TIF_SIGPENDING)
+	if (thread_info_flags & (_TIF_SIGPENDING | _TIF_NOTIFY_SIGNAL))
 		do_signal();
 
 	if (thread_info_flags&_TIF_NOTIFY_RESUME) {

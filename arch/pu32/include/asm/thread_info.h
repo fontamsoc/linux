@@ -105,6 +105,7 @@ static inline struct thread_info *current_thread_info (void) {
 #define TIF_SYSCALL_TRACE	3	/* syscall trace active */
 #define TIF_SYSCALL_TRACEPOINT	4	/* syscall tracepoint instrumentation */
 #define TIF_SYSCALL_AUDIT	5	/* syscall auditing */
+#define TIF_NOTIFY_SIGNAL	7       /* signal notifications exist */
 //#define TIF_POLLING_NRFLAG	16	/* poll_idle() is TIF_NEED_RESCHED */
 //#define TIF_MCA_INIT		17	/* this task is processing MCA or INIT */
 #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
@@ -118,6 +119,7 @@ static inline struct thread_info *current_thread_info (void) {
 #define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
 #define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
 #define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
+#define _TIF_NOTIFY_SIGNAL	(1 << TIF_NOTIFY_SIGNAL)
 //#define _TIF_POLLING_NRFLAG	(1 << TIF_POLLING_NRFLAG)
 //#define _TIF_MCA_INIT		(1 << TIF_MCA_INIT)
 #define _TIF_MEMDIE		(1 << TIF_MEMDIE)
@@ -125,6 +127,7 @@ static inline struct thread_info *current_thread_info (void) {
 //#define _TIF_RESTORE_SIGMASK	(1 << TIF_RESTORE_SIGMASK)
 //#define _TIF_SECCOMP		(1 << TIF_SECCOMP)
 
-#define _TIF_WORK_MASK		(_TIF_SIGPENDING | _TIF_NOTIFY_RESUME | _TIF_NEED_RESCHED)
+#define _TIF_WORK_MASK (_TIF_SIGPENDING | _TIF_NOTIFY_RESUME | _TIF_NEED_RESCHED | \
+                        _TIF_NOTIFY_SIGNAL)
 
 #endif	/* __ASM_PU32_THREAD_INFO_H */
