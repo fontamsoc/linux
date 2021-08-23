@@ -37,7 +37,7 @@ void pu32_timer_intr (void) {
 	local_irq_disable();
 	irq_enter();
 	struct clock_event_device *e =
-		per_cpu(clkevtdevs, smp_processor_id());
+		per_cpu(clkevtdevs, raw_smp_processor_id());
 	e->event_handler(e);
 	irq_exit();
 	local_irq_enable();
@@ -63,7 +63,7 @@ void pu32_clockevent_init (void) {
 	struct clock_event_device *e =
 		kzalloc(sizeof(*e), GFP_KERNEL);
 
-	unsigned cpu = smp_processor_id();
+	unsigned cpu = raw_smp_processor_id();
 
 	per_cpu(clkevtdevs, cpu) = e;
 

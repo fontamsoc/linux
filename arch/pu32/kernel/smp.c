@@ -229,14 +229,14 @@ void pu32_start_smp (void) {
 	c_setup();
 
 	struct mm_struct *mm = &init_mm;
-	unsigned int cpu = smp_processor_id();
+	unsigned int cpu = raw_smp_processor_id();
 
 	local_flush_tlb_all();
 	write_mmu_pagemask(0);
 	TLBMISS_HANDLER_SETUP_PGD(swapper_pg_dir);
 	TLBMISS_HANDLER_SETUP_PGD_KERNEL(swapper_pg_dir);
 
-	asid_cache(smp_processor_id()) = ASID_FIRST_VERSION;
+	asid_cache(raw_smp_processor_id()) = ASID_FIRST_VERSION;
 
 	enable_percpu_irq(ipi_irq, 0);
 
@@ -258,7 +258,7 @@ void pu32_start_smp (void) {
 #ifdef CONFIG_HOTPLUG_CPU
 int __cpu_disable(void)
 {
-	unsigned int cpu = smp_processor_id();
+	unsigned int cpu = raw_smp_processor_id();
 
 	set_cpu_online(cpu, false);
 

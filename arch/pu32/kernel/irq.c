@@ -12,7 +12,7 @@ DEFINE_PER_CPU(unsigned long, pu32irqflags);
 
 // Read interrupt enabled status.
 unsigned long arch_local_save_flags (void) {
-	return per_cpu(pu32irqflags, smp_processor_id());
+	return per_cpu(pu32irqflags, raw_smp_processor_id());
 }
 EXPORT_SYMBOL(arch_local_save_flags);
 
@@ -23,9 +23,9 @@ void arch_local_irq_restore (unsigned long flags) {
 			"setflags %0"
 			:: "r"(current_thread_info()->pu32flags |
 				PU32_FLAGS_KERNELSPACE | PU32_FLAGS_disIntr));
-		per_cpu(pu32irqflags, smp_processor_id()) = flags;
+		per_cpu(pu32irqflags, raw_smp_processor_id()) = flags;
 	} else {
-		per_cpu(pu32irqflags, smp_processor_id()) = flags;
+		per_cpu(pu32irqflags, raw_smp_processor_id()) = flags;
 		asm volatile (
 			"setflags %0"
 			:: "r"(current_thread_info()->pu32flags |
