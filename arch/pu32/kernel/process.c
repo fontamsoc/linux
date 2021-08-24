@@ -87,7 +87,7 @@ int copy_thread (
 
 	struct thread_info *pti = task_thread_info(p);
 
-	if (p->flags&PF_KTHREAD) {
+	if (p->flags & (PF_KTHREAD | PF_IO_WORKER)) {
 		// Kernel-thread.
 
 		// Additional sizeof(struct pu32_pt_regs) space
