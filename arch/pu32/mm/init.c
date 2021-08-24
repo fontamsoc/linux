@@ -48,6 +48,5 @@ static void __init paging_init (void) {
 
 void __init mem_init (void) {
 	memblock_free_all();
-	mem_init_print_info(NULL);
 	paging_init();
 }
