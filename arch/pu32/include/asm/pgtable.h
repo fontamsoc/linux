@@ -56,6 +56,7 @@
 
 #define MKP(x, w, r)                            \
 	__pgprot(_PAGE_PRESENT | _PAGE_CACHED | \
+	         _PAGE_ACCESSED |               \
 	((x) ? _PAGE_EXECUTABLE : 0) |          \
 	((w) ? _PAGE_WRITABLE   : 0) |          \
 	((r) ? _PAGE_READABLE   : 0) )
