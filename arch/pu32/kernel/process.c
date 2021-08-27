@@ -620,10 +620,6 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 
 				asm volatile ("cpy %%tp, %0" :: "r"(ti));
 
-				// There are no saved interrupt context, but
-				// set_irq_regs() must be called with a non-null value.
-				struct pt_regs *old_regs = set_irq_regs((struct pt_regs *)-1);
-
 				extern unsigned long pu32_ishw;
 				unsigned long irqsrc, ret;
 				if (pu32_ishw) {
@@ -635,10 +631,13 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 				if (irqsrc == -1)
 					irqsrc = PU32_IPI_IRQ;
 
-				if (ret == sizeof(unsigned long))
+				if (ret == sizeof(unsigned long)) {
+					// There are no saved interrupt context, but
+					// set_irq_regs() must be called with a non-null value.
+					struct pt_regs *old_regs = set_irq_regs((struct pt_regs *)-1);
 					do_IRQ(irqsrc);
-
-				set_irq_regs(old_regs);
+					set_irq_regs(old_regs);
+				}
 
 				if (!ti->preempt_count && (ti->flags&_TIF_WORK_MASK)) {
 
