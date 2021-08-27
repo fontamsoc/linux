@@ -164,7 +164,7 @@ void pu32_start_smp (void) {
 	preempt_disable();
 	void pu32_clockevent_init (void); pu32_clockevent_init();
 	pu32ctxswitchhdlr();
-	local_irq_enable();
+	raw_local_irq_enable();
 	cpu_startup_entry(CPUHP_AP_ONLINE_IDLE);
 }
 

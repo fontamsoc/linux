@@ -7,7 +7,7 @@
 #include <asm/syscall.h>
 
 void machine_restart (char *cmd) {
-	local_irq_disable();
+	raw_local_irq_disable();
 	#ifdef CONFIG_SMP
 	smp_send_stop();
 	#endif
@@ -18,7 +18,7 @@ void machine_restart (char *cmd) {
 }
 
 void machine_power_off (void) {
-	local_irq_disable();
+	raw_local_irq_disable();
 	#ifdef CONFIG_SMP
 	smp_send_stop();
 	#endif

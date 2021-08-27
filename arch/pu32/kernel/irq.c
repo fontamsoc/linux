@@ -35,10 +35,10 @@ void arch_local_irq_restore (unsigned long flags) {
 EXPORT_SYMBOL(arch_local_irq_restore);
 
 void pu32_local_irq_enable (void) {
-	local_irq_enable();
+	raw_local_irq_enable();
 }
 void pu32_local_irq_disable (void) {
-	local_irq_disable();
+	raw_local_irq_disable();
 }
 
 void __init init_IRQ (void) {
@@ -52,9 +52,9 @@ void __init init_IRQ (void) {
 }
 
 void do_IRQ (unsigned long irq) {
-	local_irq_disable();
+	raw_local_irq_disable();
 	irq_enter();
 	generic_handle_irq(irq);
 	irq_exit();
-	local_irq_enable();
+	raw_local_irq_enable();
 }

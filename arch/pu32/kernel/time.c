@@ -34,13 +34,13 @@ static struct clocksource clocksource_tsc = {
 static struct clock_event_device *clkevtdevs[NR_CPUS];
 
 void pu32_timer_intr (void) {
-	local_irq_disable();
+	raw_local_irq_disable();
 	irq_enter();
 	struct clock_event_device *e =
 		clkevtdevs[raw_smp_processor_id()];
 	e->event_handler(e);
 	irq_exit();
-	local_irq_enable();
+	raw_local_irq_enable();
 }
 
 static int pu32_timer_set_next_event (
