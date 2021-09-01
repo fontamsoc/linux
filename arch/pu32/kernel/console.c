@@ -119,6 +119,8 @@ static int tty_console_ops_open (struct tty_struct *tty, struct file *filp) {
 		while (hwdrvchar_read (&hwdrvchar_dev, &((char){0}), 1));
 	else
 		while (pu32sysread (PU32_BIOS_FD_STDIN, &((char){0}), 1));
+	if (tty->count > 1)
+		return 0;
 	if (pu32_ttys_irq != -1) {
 		int ret = request_irq (
 			pu32_ttys_irq, tty_console_isr,
