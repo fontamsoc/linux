@@ -100,9 +100,10 @@ __attribute__((noreturn)) void __init pu32_start (char **argv, char **envp) {
 		return NULL;
 	}
 
-	if (getenv("ISHW", envp)) {
+	void *___ishw;
+	if ((___ishw = getenv("___ISHW", envp))) {
 
-		pu32_ishw = 1;
+		pu32_ishw = *(unsigned long *)___ishw;
 
 		hwdrvdevtbl hwdrvdevtbl_dev = {.e = (devtblentry *)0, .id = 1 /* RAM device */};
 

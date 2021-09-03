@@ -229,6 +229,10 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 
 	local_flush_tlb_all();
 
+	extern unsigned long pu32_ishw;
+	if (pu32_ishw) // Enable core to receive device interrupts.
+		hwdrvintctrl_ack(raw_smp_processor_id(), 1);
+
 	goto sysret;
 
 	pu32FaultReason faultreason;
@@ -620,10 +624,10 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 
 				asm volatile ("cpy %%tp, %0" :: "r"(ti));
 
-				extern unsigned long pu32_ishw;
 				unsigned long irqsrc, ret;
 				if (pu32_ishw) {
-					irqsrc = hwdrvintctrl_ack();
+					if ((irqsrc = hwdrvintctrl_ack(raw_smp_processor_id(), 1)) == -2)
+						goto skip_irq;
 					ret = sizeof(unsigned long);
 				} else
 					ret = pu32sysread (PU32_BIOS_FD_INTCTRLDEV, &irqsrc, sizeof(unsigned long));
@@ -638,6 +642,8 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 					do_IRQ(irqsrc);
 					set_irq_regs(old_regs);
 				}
+
+				skip_irq:;
 
 				if (!ti->preempt_count && (ti->flags&_TIF_WORK_MASK)) {
 

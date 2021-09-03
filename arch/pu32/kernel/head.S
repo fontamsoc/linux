@@ -58,6 +58,10 @@ END(_start)
 #ifdef CONFIG_SMP
 
 ENTRY(_inc_cpu_up_arg)
+	# Restore default value at PARKPU_RLI16IMM_ADDR.
+	li %sr, PARKPU_RLI16IMM_ADDR
+	li %1, -10
+	st16 %1, %sr
 
 	rli %sr, cpu_up_arg
 	ld32 %1, %sr
@@ -70,6 +74,10 @@ ENTRY(_inc_cpu_up_arg)
 END(_inc_cpu_up_arg)
 
 ENTRY(_start_smp)
+	# Restore default value at PARKPU_RLI16IMM_ADDR.
+	li %sr, PARKPU_RLI16IMM_ADDR
+	li %1, -10
+	st16 %1, %sr
 
 	rli %sr, cpu_up_arg
 	ld32 %sp, %sr
