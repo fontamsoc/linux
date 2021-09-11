@@ -16,6 +16,8 @@
 #include <hwdrvchar.h>
 static hwdrvchar hwdrvchar_dev;
 
+#include <hwdrvintctrl.h>
+
 extern unsigned long pu32_ishw;
 
 static unsigned long pu32_ttys_irq = -1;
@@ -126,8 +128,10 @@ static int tty_console_ops_open (struct tty_struct *tty, struct file *filp) {
 		if (ret) {
 			pr_err("request_irq(%lu) == %d\n", pu32_ttys_irq, ret);
 			tty_port_tty_set (tty->port, NULL);
-		} else if (pu32_ishw)
+		} else if (pu32_ishw) {
 			hwdrvchar_interrupt (&hwdrvchar_dev, 1);
+			hwdrvintctrl_ena (pu32_ttys_irq, 1);
+		}
 		return ret;
 	} else {
 		mod_timer (&tty_console_timer, jiffies + TTY_CONSOLE_POLL_DELAY);
@@ -137,9 +141,11 @@ static int tty_console_ops_open (struct tty_struct *tty, struct file *filp) {
 
 static void tty_console_ops_close (struct tty_struct *tty, struct file *filp) {
 	if (tty->count == 1) {
-		if (pu32_ttys_irq != -1)
+		if (pu32_ttys_irq != -1) {
+			hwdrvintctrl_ena (pu32_ttys_irq, 0);
+			hwdrvchar_interrupt (&hwdrvchar_dev, 0);
 			free_irq (pu32_ttys_irq, tty);
-		else
+		} else
 			del_timer_sync(&tty_console_timer);
 		tty_port_tty_set (tty->port, NULL);
 	}
