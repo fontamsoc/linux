@@ -87,24 +87,9 @@ static struct blk_mq_ops pu32hdd_mq_ops = {
 	.queue_rq = pu32hdd_queue_rq,
 };
 
-/* The HDIO_GETGEO ioctl is handled in blkdev_ioctl(),
-   which calls this. We need to implement getgeo, otherwise
-   we can't use tools such as fdisk to partition the drive. */
-static int pu32hdd_getgeo (
-	struct block_device *block_device,
-	struct hd_geometry *geo) {
-	// We have no real geometry, so we make something up.
-	geo->cylinders = ((pu32hdd_dev.capacity*(pu32hdd_dev.sectorsz/KERNEL_SECTOR_SIZE))/64);
-	geo->heads = 4;
-	geo->sectors = 16;
-	geo->start = 0;
-	return 0;
-}
-
 // Device operations structure.
 static struct block_device_operations pu32hdd_ops = {
 	.owner = THIS_MODULE,
-	.getgeo = pu32hdd_getgeo,
 };
 
 static int __init pu32hdd_init (void) {
