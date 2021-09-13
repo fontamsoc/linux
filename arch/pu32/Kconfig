@@ -116,5 +116,6 @@ config EARLY_PRINTK
 
 config PU32_DEBUG
 	def_bool y
+	select DEBUG_ATOMIC_SLEEP
 
 source "arch/pu32/drivers/Kconfig"
