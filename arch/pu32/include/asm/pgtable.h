@@ -64,9 +64,9 @@
 // Masks of bits that are to be preserved across pgprot changes.
 #define _PAGE_CHG_MASK	(_PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_USER)
 
-#define PAGE_SHARED 		__pgprot(_PAGE_PRESENT | _PAGE_CACHED | _PAGE_READABLE | _PAGE_WRITABLE)
+#define PAGE_SHARED 		__pgprot(_PAGE_PRESENT | _PAGE_CACHED | _PAGE_ACCESSED | _PAGE_READABLE | _PAGE_WRITABLE)
 #define PAGE_KERNEL		PAGE_SHARED
-#define PAGE_KERNEL_NOCACHE	__pgprot(_PAGE_PRESENT | _PAGE_READABLE | _PAGE_WRITABLE)
+#define PAGE_KERNEL_NOCACHE	__pgprot(_PAGE_PRESENT | _PAGE_READABLE | _PAGE_ACCESSED | _PAGE_WRITABLE)
 #define PAGE_COPY 		MKP(0, 0, 1)
 
 // Remove W bit on private pages for COW support.
