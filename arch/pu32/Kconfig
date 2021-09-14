@@ -118,5 +118,6 @@ config PU32_DEBUG
 	def_bool y
 	select DEBUG_ATOMIC_SLEEP
 	select SCHED_STACK_END_CHECK
+	select DEBUG_PREEMPT
 
 source "arch/pu32/drivers/Kconfig"
