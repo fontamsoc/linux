@@ -31,6 +31,7 @@ struct thread_info {
 	unsigned long		tls;
 	unsigned long		ksp, kr1, kpc;
 	unsigned long		pu32flags; // flags to use in userspace.
+	struct pt_regs		*regs;
 };
 
 #define __HAVE_THREAD_FUNCTIONS
