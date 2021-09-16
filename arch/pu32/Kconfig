@@ -122,5 +122,7 @@ config PU32_DEBUG
 	select DEBUG_KMEMLEAK
 	select DEBUG_KMEMLEAK_DEFAULT_OFF
 	select DEBUG_MEMORY_INIT
+	select ARCH_USE_MEMTEST
+	select MEMTEST
 
 source "arch/pu32/drivers/Kconfig"
