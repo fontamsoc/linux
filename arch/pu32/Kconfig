@@ -121,5 +121,6 @@ config PU32_DEBUG
 	select HAVE_DEBUG_KMEMLEAK
 	select DEBUG_KMEMLEAK
 	select DEBUG_KMEMLEAK_DEFAULT_OFF
+	select DEBUG_MEMORY_INIT
 
 source "arch/pu32/drivers/Kconfig"
