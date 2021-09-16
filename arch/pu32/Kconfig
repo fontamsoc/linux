@@ -114,7 +114,7 @@ config EARLY_PRINTK
 	def_bool y
 
 config PU32_DEBUG
-	def_bool y
+	def_bool n
 	select DEBUG_ATOMIC_SLEEP
 	select SCHED_STACK_END_CHECK
 	select DEBUG_PREEMPT
