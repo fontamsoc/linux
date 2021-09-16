@@ -125,5 +125,6 @@ config PU32_DEBUG
 	select ARCH_USE_MEMTEST
 	select MEMTEST
 	select RCU_EQS_DEBUG
+	select PRINTK_CALLER
 
 source "arch/pu32/drivers/Kconfig"
