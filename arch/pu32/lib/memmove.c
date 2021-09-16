@@ -17,7 +17,6 @@
 // Returns dst.
 void *uintcpy2 (void *dst, const void *src, unsigned long cnt); __asm__ (
 	".text\n"
-	".global  uintcpy2\n"
 	".type    uintcpy2, @function\n"
 	".p2align 1\n"
 	"uintcpy2:\n"
@@ -42,7 +41,6 @@ void *uintcpy2 (void *dst, const void *src, unsigned long cnt); __asm__ (
 // Returns dst.
 void *u8cpy2 (void *dst, const void *src, unsigned long cnt); __asm__ (
 	".text\n"
-	".global  u8cpy2\n"
 	".type    u8cpy2, @function\n"
 	".p2align 1\n"
 	"u8cpy2:\n"

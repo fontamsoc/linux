@@ -10,7 +10,6 @@
 // Returns (dst+(cnt*sizeof(unsigned long))).
 void *uintcpy (void *dst, const void *src, unsigned long cnt); __asm__ (
 	".text\n"
-	".global  uintcpy\n"
 	".type    uintcpy, @function\n"
 	".p2align 1\n"
 	"uintcpy:\n"
@@ -32,7 +31,6 @@ void *uintcpy (void *dst, const void *src, unsigned long cnt); __asm__ (
 // Returns (dst+cnt).
 void *u8cpy (void *dst, const void *src, unsigned long cnt); __asm__ (
 	".text\n"
-	".global  u8cpy\n"
 	".type    u8cpy, @function\n"
 	".p2align 1\n"
 	"u8cpy:\n"
