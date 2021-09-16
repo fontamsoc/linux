@@ -126,5 +126,6 @@ config PU32_DEBUG
 	select MEMTEST
 	select RCU_EQS_DEBUG
 	select PRINTK_CALLER
+	select DEBUG_IRQFLAGS
 
 source "arch/pu32/drivers/Kconfig"
