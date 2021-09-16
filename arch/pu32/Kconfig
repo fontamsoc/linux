@@ -1,7 +1,6 @@
 config PU32
 	def_bool y
 	select PRINTK_TIME
-	select HAVE_DEBUG_KMEMLEAK
 	select HAVE_DEBUG_BUGVERBOSE
 	select NO_DMA
 	select ARCH_32BIT_OFF_T
@@ -119,5 +118,8 @@ config PU32_DEBUG
 	select DEBUG_ATOMIC_SLEEP
 	select SCHED_STACK_END_CHECK
 	select DEBUG_PREEMPT
+	select HAVE_DEBUG_KMEMLEAK
+	select DEBUG_KMEMLEAK
+	select DEBUG_KMEMLEAK_DEFAULT_OFF
 
 source "arch/pu32/drivers/Kconfig"
