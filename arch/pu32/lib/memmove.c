@@ -23,8 +23,6 @@ void *uintcpy2 (void *dst, const void *src, unsigned long cnt); __asm__ (
 
 	"rli %sr, 1f\n"
 	"jz %3, %sr\n"
-	"li8 %sr, "__stringify(__SIZEOF_POINTER_ORDER__)"\n"
-	"sll %3, %sr\n"
 	"add %1, %3\n"
 	"add %2, %3\n"
 	"rli %sr, 0f; 0:\n"
@@ -69,7 +67,7 @@ void *memmove (void *dest, const void *src, size_t count) {
 		if (((unsigned long)dest|(unsigned long)src|(unsigned long)count)%sizeof(unsigned long))
 			return u8cpy2 (dest, src, count);
 		else
-			return uintcpy2 (dest, src, count/sizeof(unsigned long));
+			return uintcpy2 (dest, src, count);
 	}
 }
 EXPORT_SYMBOL(memmove);
