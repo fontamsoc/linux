@@ -781,6 +781,38 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 // that it occupies lives between __init_begin
 // and __init_end and gets freed.
 void arch_call_rest_init (void) {
+	void add_pte (unsigned long addr, unsigned long prot) {
+		pgd_t *pgd = swapper_pg_dir + pgd_index(addr);
+		pmd_t *pmd = pmd_offset((pud_t *)pgd, addr); // There is no pmd; this does pmd = pgd.
+		if (pmd_present(*pmd)) {
+			pte_t pte = *pte_offset_map(pmd, addr);
+			if (pte_present(pte)) // The mapping must not already exist.
+				panic("add_pte: invalid pgd: pte already exist: 0x%x\n",
+					(unsigned)pte_val(pte));
+		} else
+			(void)pte_alloc(&init_mm, pmd);
+		set_pte_at(
+			&init_mm, addr,
+			pte_offset_map(pmd, addr),
+			__pte((addr & PAGE_MASK) | prot));
+	}
+	add_pte(0, _PAGE_PRESENT | _PAGE_READABLE | _PAGE_WRITABLE);
+	unsigned long addr;
+	extern char __pu32tramp_start[], __pu32tramp_end[];
+	for (addr = (unsigned long)__pu32tramp_start; addr < (unsigned long)__pu32tramp_end; addr += PAGE_SIZE)
+		add_pte(addr, _PAGE_PRESENT | _PAGE_USER | _PAGE_CACHED | _PAGE_EXECUTABLE);
+	#if 0
+	// ### Since setksl is used, these are no longer needed, but kept for future reference.
+	for (addr = (unsigned long)_text; addr < (unsigned long)_etext; addr += PAGE_SIZE)
+		add_pte(addr,
+			((addr >= (unsigned long)__pu32tramp_start && addr < (unsigned long)__pu32tramp_end) ?
+				_PAGE_USER : 0) | _PAGE_PRESENT | _PAGE_EXECUTABLE);
+	for (addr = (unsigned long)__start_rodata; addr < (unsigned long)__end_rodata; addr += PAGE_SIZE)
+		add_pte(addr, _PAGE_PRESENT | _PAGE_READABLE);
+	extern char __start_rwdata[], __end_rwdata[];
+	for (addr = (unsigned long)__start_rwdata; addr < (unsigned long)__end_rwdata; addr += PAGE_SIZE)
+		add_pte(addr, _PAGE_PRESENT | _PAGE_READABLE | _PAGE_WRITABLE);
+	#endif
 	pu32ctxswitchhdlr();
 	rest_init();
 }
