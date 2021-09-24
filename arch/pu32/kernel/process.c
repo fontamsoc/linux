@@ -249,14 +249,13 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 	// pu32_cpu_curr[] is used instead.
 	while (1) {
 
+		struct task_struct *tsk = pu32_cpu_curr[raw_smp_processor_id()];
+		struct thread_info *ti = task_thread_info(tsk);
+		asm volatile ("cpy %%tp, %0" :: "r"(ti));
+
 		switch (faultreason) {
 
 			case pu32SysOpIntr: {
-
-				struct task_struct *tsk = pu32_cpu_curr[raw_smp_processor_id()];
-				struct thread_info *ti = task_thread_info(tsk);
-
-				asm volatile ("cpy %%tp, %0" :: "r"(ti));
 
 				switch (sysopcode&0xff) {
 
@@ -510,11 +509,6 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 			case pu32ExecFaultIntr:
 			case pu32AlignFaultIntr: {
 
-				struct task_struct *tsk = pu32_cpu_curr[raw_smp_processor_id()];
-				struct thread_info *ti = task_thread_info(tsk);
-
-				asm volatile ("cpy %%tp, %0" :: "r"(ti));
-
 				unsigned long faultaddr;
 				asm volatile ("getfaultaddr %0" : "=r"(faultaddr));
 
@@ -619,11 +613,6 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 				}
 				#endif
 
-				struct task_struct *tsk = pu32_cpu_curr[raw_smp_processor_id()];
-				struct thread_info *ti = task_thread_info(tsk);
-
-				asm volatile ("cpy %%tp, %0" :: "r"(ti));
-
 				unsigned long irqsrc, ret;
 				if (pu32_ishw) {
 					if ((irqsrc = hwdrvintctrl_ack(raw_smp_processor_id(), 1)) == -2)
@@ -679,11 +668,6 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 				}
 				#endif
 
-				struct task_struct *tsk = pu32_cpu_curr[raw_smp_processor_id()];
-				struct thread_info *ti = task_thread_info(tsk);
-
-				asm volatile ("cpy %%tp, %0" :: "r"(ti));
-
 				// There are no saved interrupt context, but
 				// set_irq_regs() must be called with a non-null value.
 				struct pt_regs *old_regs = set_irq_regs((struct pt_regs *)-1);
@@ -723,11 +707,6 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 					             // it is left in place for completeness.
 				}
 				#endif
-
-				struct task_struct *tsk = pu32_cpu_curr[raw_smp_processor_id()];
-				struct thread_info *ti = task_thread_info(tsk);
-
-				asm volatile ("cpy %%tp, %0" :: "r"(ti));
 
 				if (!ti->preempt_count) {
 
@@ -774,8 +753,6 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 		#ifdef CONFIG_CONTEXT_TRACKING
 		void context_tracking_user_enter(void);
 		void context_tracking_user_exit(void);
-		struct thread_info *ti;
-		asm volatile ("cpy %0, %%tp" : "=r"(ti));
 		unsigned long ti_in_userspace;
 		if ((ti_in_userspace = pu32_in_userspace(ti)))
 			context_tracking_user_enter();
