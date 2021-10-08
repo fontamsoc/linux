@@ -45,21 +45,24 @@
 				"cpy %%sr, %2; cldst8 %0, %1"	\
 				: "+r" (_n_)			\
 				: "r" (_p_),			\
-				  "r" (_o_));			\
+				  "r" (_o_)			\
+				: "%sr");			\
 			break;					\
 		case 2:						\
 			__asm__ __volatile__ (			\
 				"cpy %%sr, %2; cldst16 %0, %1"	\
 				: "+r" (_n_)			\
 				: "r" (_p_),			\
-				  "r" (_o_));			\
+				  "r" (_o_)			\
+				: "%sr");			\
 			break;					\
 		case 4:						\
 			__asm__ __volatile__ (			\
 				"cpy %%sr, %2; cldst32 %0, %1"	\
 				: "+r" (_n_)			\
 				: "r" (_p_),			\
-				  "r" (_o_));			\
+				  "r" (_o_)			\
+				: "%sr");			\
 			break;					\
 		default:					\
 			while(1)				\
