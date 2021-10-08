@@ -9,7 +9,7 @@
 #define mb() \
 	do { \
 		unsigned long x; \
-		asm volatile ("ldst %%sr, %0" :: "r" (&x) : "memory"); \
+		asm volatile ("ldst %%sr, %0" :: "r" (&x) : "%sr", "memory"); \
 	} while (0)
 
 #include <asm-generic/barrier.h>
