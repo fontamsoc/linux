@@ -34,7 +34,8 @@
 		: "r"   (uaddr),				\
 		  "r"   (oparg),				\
 		  "i"   (-EFAULT),				\
-		  "i"   (-EAGAIN))
+		  "i"   (-EAGAIN)				\
+		: "%sr")					\
 
 static inline int arch_futex_atomic_op_inuser (
 	int op, u32 oparg, int *oval, u32 __user *uaddr) {
