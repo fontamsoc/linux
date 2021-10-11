@@ -728,7 +728,9 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 					asm volatile (
 						"setflags %0\n"
 						:: "r"(PU32_FLAGS_KERNELSPACE | PU32_FLAGS_disIntr));
-				}
+
+				} else
+					asm volatile ("halt");
 
 				goto sysret;
 			}
