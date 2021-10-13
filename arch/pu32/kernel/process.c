@@ -18,12 +18,6 @@
 
 #include <pu32.h>
 
-#if ((PREEMPT_ENABLED) != 0)
-// When checking current_thread_info()->preempt_count
-// we assume that preemption is enabled when it is null.
-#error expecting (PREEMPT_ENABLED == 0)
-#endif
-
 // Buffer used in various locations with snprintf().
 char pu32strbuf[PU32STRBUFSZ];
 
@@ -365,7 +359,7 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 									next_pc = next_pt_regs->pc;
 								}
 
-								if (!next_ti->preempt_count)
+								if (next_ti->preempt_count == PREEMPT_ENABLED)
 									raw_local_irq_enable();
 
 								// Note that %1 and %pc are not restored.
@@ -634,7 +628,7 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 
 				skip_irq:;
 
-				if (!ti->preempt_count && (ti->flags&_TIF_WORK_MASK)) {
+				if (ti->preempt_count == PREEMPT_ENABLED && (ti->flags&_TIF_WORK_MASK)) {
 
 					save_pu32umode_regs(ti, PU32_PT_REGS_WHICH_ALL, pu32ExtIntr, sysopcode);
 
@@ -674,7 +668,7 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 				pu32_timer_intr();
 				set_irq_regs(old_regs);
 
-				if (!ti->preempt_count && (ti->flags&_TIF_WORK_MASK)) {
+				if (ti->preempt_count == PREEMPT_ENABLED && (ti->flags&_TIF_WORK_MASK)) {
 
 					save_pu32umode_regs(ti, PU32_PT_REGS_WHICH_ALL, pu32TimerIntr, sysopcode);
 
@@ -708,7 +702,7 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 				}
 				#endif
 
-				if (!ti->preempt_count) {
+				if (ti->preempt_count == PREEMPT_ENABLED) {
 
 					ti->flags |= _TIF_NEED_RESCHED;
 
