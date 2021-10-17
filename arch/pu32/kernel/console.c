@@ -85,7 +85,7 @@ static void tty_console_poll (struct timer_list *_) {
 		mod_timer (&tty_console_timer, jiffies + TTY_CONSOLE_POLL_DELAY);
 }
 
-static irqreturn_t tty_console_isr (int irq, void *_) {
+static irqreturn_t tty_console_isr (int _, void *__) {
 	unsigned char c;
 	unsigned long n = 0;
 	unsigned long hwchardev_read (void) {
@@ -173,7 +173,7 @@ static const struct tty_operations tty_console_ops = {
 };
 
 #include <hwdrvdevtbl.h>
-hwdrvdevtbl hwdrvdevtbl_dev = {.e = (devtblentry *)0, .id = 5 /* Character device */};
+static hwdrvdevtbl hwdrvdevtbl_dev = {.e = (devtblentry *)0, .id = 5 /* Character device */};
 
 void hwchardev_init (void) {
 	hwdrvdevtbl_find (&hwdrvdevtbl_dev);
