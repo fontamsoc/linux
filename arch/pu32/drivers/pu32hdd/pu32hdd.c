@@ -10,8 +10,29 @@
 #include <linux/blkdev.h>
 #include <linux/blk-mq.h>
 #include <linux/hdreg.h>
+#include <linux/wait.h>
+#include <linux/interrupt.h>
 
 #include <pu32.h>
+
+#include <hwdrvblkdev.h>
+static hwdrvblkdev hwdrvblkdev_dev;
+
+#include <hwdrvintctrl.h>
+
+static long hw_en = 0;
+module_param(hw_en, long, 0644);
+MODULE_PARM_DESC(hw_en, "use hw instead of bios");
+
+static long irq_en = 0;
+module_param(irq_en, long, 0644);
+MODULE_PARM_DESC(irq_en, "enable interrupt");
+
+extern unsigned long pu32_ishw;
+
+static unsigned long pu32hdd_ishw = 0;
+
+static unsigned long pu32_blkdev_irq = -1;
 
 // We can tweak our hardware sector size, but the kernel
 // talks to us in terms of small sectors, always.
@@ -38,6 +59,28 @@ static struct pu32hdd_device {
 	struct request_queue *queue;
 } pu32hdd_dev = { .major_num = 0, .sectorsz = KERNEL_SECTOR_SIZE /* TODO: A diffent value like 2048 always fail */, };
 
+static DECLARE_WAIT_QUEUE_HEAD(pu32hdd_wq);
+
+volatile unsigned long hwdrvblkdev_rqst = 0;
+
+static void hwdrvblkdev_isbsy_ (void) {
+	unsigned long en = (irq_en && preemptible() && !rcu_preempt_depth());
+	if (pu32_blkdev_irq != -1)
+		hwdrvintctrl_ena (pu32_blkdev_irq, en);
+	if (en)
+		wait_event_interruptible(pu32hdd_wq, (hwdrvblkdev_rqst == 0));
+	else
+		hwdrvblkdev_rqst = 0;
+}
+
+static irqreturn_t pu32hdd_isr (int _, void *__) {
+	if (hwdrvblkdev_rqst) {
+		hwdrvblkdev_rqst = 0;
+		wake_up_interruptible(&pu32hdd_wq);
+	}
+	return IRQ_HANDLED;
+}
+
 // Serve requests.
 static int pu32hdd_do_request (struct request *rq, unsigned int *nr_bytes) {
 	struct bio_vec bvec;
@@ -51,15 +94,44 @@ static int pu32hdd_do_request (struct request *rq, unsigned int *nr_bytes) {
 		void* buf = (page_address(bvec.bv_page) + bvec.bv_offset);
 		if ((pos + bufsz) > devsz)
 			bufsz = (unsigned long)(devsz - pos);
-		if (((loff_t)pu32syslseek (PU32_BIOS_FD_STORAGEDEV, pos/BLKSZ, SEEK_SET) * BLKSZ) != pos)
-			return -EIO;
+		unsigned long en = (hw_en && pu32hdd_ishw);
+		if (pu32_blkdev_irq != -1)
+			hwdrvintctrl_ena (pu32_blkdev_irq, (en && irq_en));
 		unsigned long i = 0;
-		if (rq_data_dir(rq) == WRITE) {
-			while (i < bufsz)
-				i += ((loff_t)pu32syswrite (PU32_BIOS_FD_STORAGEDEV, buf+i, (bufsz-i)/BLKSZ) * BLKSZ);
+		if (en) {
+			signed long ret;
+			if (rq_data_dir(rq) == WRITE) {
+				while (i < bufsz) {
+					do {
+						if ((ret = hwdrvblkdev_isrdy (&hwdrvblkdev_dev)) == -1)
+							return -EIO;
+					} while (ret == 0);
+					hwdrvblkdev_rqst = 1;
+					hwdrvblkdev_write (&hwdrvblkdev_dev, buf+i, (pos+i)/BLKSZ, ((i + BLKSZ) < bufsz));
+					i += BLKSZ;
+				}
+			} else {
+				while (i < bufsz) {
+					do {
+						do {
+							if ((ret = hwdrvblkdev_isrdy (&hwdrvblkdev_dev)) == -1)
+								return -EIO;
+						} while (ret == 0);
+						hwdrvblkdev_rqst = 1;
+					} while (!hwdrvblkdev_read (&hwdrvblkdev_dev, buf+i, (pos+i)/BLKSZ, ((i + BLKSZ) < bufsz)));
+					i += BLKSZ;
+				}
+			}
 		} else {
-			while (i < bufsz)
-				i += ((loff_t)pu32sysread (PU32_BIOS_FD_STORAGEDEV, buf+i, (bufsz-i)/BLKSZ) * BLKSZ);
+			if (((loff_t)pu32syslseek (PU32_BIOS_FD_STORAGEDEV, pos/BLKSZ, SEEK_SET) * BLKSZ) != pos)
+				return -EIO;
+			if (rq_data_dir(rq) == WRITE) {
+				while (i < bufsz)
+					i += ((loff_t)pu32syswrite (PU32_BIOS_FD_STORAGEDEV, buf+i, (bufsz-i)/BLKSZ) * BLKSZ);
+			} else {
+				while (i < bufsz)
+					i += ((loff_t)pu32sysread (PU32_BIOS_FD_STORAGEDEV, buf+i, (bufsz-i)/BLKSZ) * BLKSZ);
+			}
 		}
 		pos += bufsz;
 		*nr_bytes += bufsz;
@@ -92,14 +164,60 @@ static struct block_device_operations pu32hdd_ops = {
 	.owner = THIS_MODULE,
 };
 
+#define BLKDEVADDR (0x0 /* By convention, the first block device is located at 0x0 */)
+#define BLKDEVINTR (0 /* By convention, intr 0 is reserved for the first block device */)
+
+#include <hwdrvdevtbl.h>
+static hwdrvdevtbl hwdrvdevtbl_dev = {
+	.e = (devtblentry *)0, .id = 4 /* Block device */,
+	.mapsz = 128, .addr = BLKDEVADDR, .intridx = BLKDEVINTR };
+
+void pu32_blkdev_irq_free (void) {
+	hwdrvintctrl_ena (pu32_blkdev_irq, 0);
+	free_irq (pu32_blkdev_irq, &pu32hdd_dev);
+	pu32_blkdev_irq = -1;
+}
+
+unsigned long hwdrvblkdev_init_ (void) {
+	//hwdrvdevtbl_find (&hwdrvdevtbl_dev); // Not needed since using conventional BLKDEVADDR BLKDEVINTR to match BIOS.
+	if (!hwdrvdevtbl_dev.mapsz)
+		goto out;
+	pu32hdd_ishw = 1;
+	hw_en = 1;
+	if (hwdrvdevtbl_dev.intridx != -1) {
+		int ret = request_irq (
+			hwdrvdevtbl_dev.intridx, pu32hdd_isr,
+			IRQF_SHARED, "pu32hdd", &((unsigned){0}));
+		if (ret)
+			pr_err("request_irq(%lu) == %d\n", hwdrvdevtbl_dev.intridx, ret);
+		else {
+			hwdrvblkdev_isbsy = hwdrvblkdev_isbsy_;
+			hwdrvintctrl_ena (hwdrvdevtbl_dev.intridx, 1);
+			pu32_blkdev_irq = hwdrvdevtbl_dev.intridx;
+		}
+	}
+	hwdrvblkdev_dev.addr = hwdrvdevtbl_dev.addr;
+	hwdrvblkdev_rqst = 1;
+	if (!hwdrvblkdev_init (&hwdrvblkdev_dev, 0))
+		goto out_free_irq;
+	irq_en = (pu32_blkdev_irq != -1);
+	return hwdrvblkdev_dev.blkcnt;
+	out_free_irq:
+	if (pu32_blkdev_irq != -1)
+		pu32_blkdev_irq_free();
+	out:
+	return 0;
+}
+
 static int __init pu32hdd_init (void) {
-	pu32hdd_dev.capacity = (
-		// Device capacity in pu32hdd_dev.sectorsz size.
-		(pu32syslseek (
-			PU32_BIOS_FD_STORAGEDEV, 0, SEEK_END) * BLKSZ) /
-			pu32hdd_dev.sectorsz);
+	if (!pu32_ishw || !(pu32hdd_dev.capacity = hwdrvblkdev_init_())) {
+		pu32hdd_dev.capacity = // Fallback to using BIOS.
+			pu32syslseek (PU32_BIOS_FD_STORAGEDEV, 0, SEEK_END);
+	}
 	if (!pu32hdd_dev.capacity)
 		goto out;
+	pu32hdd_dev.capacity = // Device capacity in pu32hdd_dev.sectorsz size.
+		((pu32hdd_dev.capacity * BLKSZ) / pu32hdd_dev.sectorsz);
 	pu32hdd_dev.queue = blk_mq_init_sq_queue (
 		&pu32hdd_dev.tag_set, &pu32hdd_mq_ops, 128,
 		BLK_MQ_F_SHOULD_MERGE);
@@ -134,6 +252,8 @@ static int __init pu32hdd_init (void) {
 }
 
 static void __exit pu32hdd_exit (void) {
+	if (pu32_blkdev_irq != -1)
+		pu32_blkdev_irq_free();
 	del_gendisk(pu32hdd_dev.gd);
 	put_disk(pu32hdd_dev.gd);
 	unregister_blkdev (pu32hdd_dev.major_num, "hd");
