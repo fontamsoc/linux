@@ -6,7 +6,7 @@
 
 // Reserved region for BIOS at the start of memory.
 // Must match corresponding constant in the bootloader source-code.
-#define PU32_BIOS_RESERVED_MEM (3*PAGE_SIZE)
+#define PU32_BIOS_RESERVED_MEM (7*PAGE_SIZE)
 
 #define KERNELADDR (PAGE_SIZE + PU32_BIOS_RESERVED_MEM)
 
