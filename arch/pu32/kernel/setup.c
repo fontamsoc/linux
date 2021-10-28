@@ -26,6 +26,7 @@ unsigned long pu32_mem_end_high;
 unsigned long pu32_TASK_UNMAPPED_BASE;
 
 unsigned long pu32_ishw = 0;
+unsigned long pu32_bios_end = KERNELADDR;
 
 #ifdef CONFIG_SMP
 void __init setup_smp (void);
@@ -44,8 +45,8 @@ void __init setup_arch (char **cmdline_p) {
 
 	/* memblock_init(void) */ {
 		memblock_add(pu32_mem_start, pu32_mem_end - pu32_mem_start);
-		if ((unsigned long)_stext > (unsigned long)PAGE_SIZE) /* Reserved PU32_BIOS_RESERVED_MEM */
-			memblock_reserve((unsigned long)PAGE_SIZE, (unsigned long)_stext - (unsigned long)PAGE_SIZE);
+		if (pu32_bios_end < KERNELADDR)
+			memblock_reserve((unsigned long)PAGE_SIZE, (unsigned long)pu32_bios_end - (unsigned long)PAGE_SIZE);
 		memblock_reserve((unsigned long)_stext, (unsigned long)_end - (unsigned long)_stext);
 		min_low_pfn = PFN_UP(pu32_mem_start);
 		max_low_pfn = PFN_DOWN(pu32_mem_end);
@@ -105,8 +106,13 @@ __attribute__((noreturn)) void __init pu32_start (char **argv, char **envp) {
 
 		pu32_ishw = *(unsigned long *)___ishw;
 
-		hwdrvdevtbl hwdrvdevtbl_dev = {.e = (devtblentry *)0, .id = 1 /* RAM device */};
+		void *___biosend;
+		if ((___biosend = getenv("BIOSend", envp))) {
+			// Update where BIOS ends in memory.
+			pu32_bios_end = PFN_ALIGN(*(unsigned long *)___biosend);
+		}
 
+		hwdrvdevtbl hwdrvdevtbl_dev = {.e = (devtblentry *)0, .id = 1 /* RAM device */};
 		hwdrvdevtbl_find (&hwdrvdevtbl_dev);
 		if (!hwdrvdevtbl_dev.mapsz) {
 			pu32stdout("memory not found\n");
