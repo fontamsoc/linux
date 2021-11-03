@@ -20,19 +20,45 @@ static hwdrvblkdev hwdrvblkdev_dev;
 
 #include <hwdrvintctrl.h>
 
-static long hw_en = 0;
-module_param(hw_en, long, 0644);
+static long pu32hdd_param_hw_en = 0;
+static long pu32hdd_param_irq_en = 0;
+
+static unsigned long pu32hdd_ishw = 0;
+static unsigned long pu32hdd_irq = -1;
+
+static int pu32hdd_param_hw_en_ops_set (const char *val, const struct kernel_param *kp) {
+	if (pu32hdd_ishw != 0)
+		return param_set_int(val, kp);
+	return 0;
+}
+static int pu32hdd_param_hw_en_ops_get (char *buf, const struct kernel_param *kp) {
+	return param_get_int(buf, kp);
+}
+static const struct kernel_param_ops pu32hdd_param_hw_en_ops = {
+        .set = pu32hdd_param_hw_en_ops_set,
+        .get = pu32hdd_param_hw_en_ops_get
+};
+
+static int pu32hdd_param_irq_en_ops_set (const char *val, const struct kernel_param *kp) {
+	if (pu32hdd_irq != -1)
+		return param_set_int(val, kp);
+	return 0;
+}
+static int pu32hdd_param_irq_en_ops_get (char *buf, const struct kernel_param *kp) {
+	return param_get_int(buf, kp);
+}
+static const struct kernel_param_ops pu32hdd_param_irq_en_ops = {
+        .set = pu32hdd_param_irq_en_ops_set,
+        .get = pu32hdd_param_irq_en_ops_get
+};
+
+module_param_cb(hw_en, &pu32hdd_param_hw_en_ops, &pu32hdd_param_hw_en, 0644);
 MODULE_PARM_DESC(hw_en, "use hw instead of bios");
 
-static long irq_en = 0;
-module_param(irq_en, long, 0644);
+module_param_cb(irq_en, &pu32hdd_param_irq_en_ops, &pu32hdd_param_irq_en, 0644);
 MODULE_PARM_DESC(irq_en, "enable interrupt");
 
 extern unsigned long pu32_ishw;
-
-static unsigned long pu32hdd_ishw = 0;
-
-static unsigned long pu32_blkdev_irq = -1;
 
 // We can tweak our hardware sector size, but the kernel
 // talks to us in terms of small sectors, always.
@@ -64,9 +90,9 @@ static DECLARE_WAIT_QUEUE_HEAD(pu32hdd_wq);
 volatile unsigned long hwdrvblkdev_rqst = 0;
 
 static void hwdrvblkdev_isbsy_ (void) {
-	unsigned long en = (irq_en && preemptible() && !rcu_preempt_depth());
-	if (pu32_blkdev_irq != -1)
-		hwdrvintctrl_ena (pu32_blkdev_irq, en);
+	unsigned long en = (pu32hdd_param_irq_en && preemptible() && !rcu_preempt_depth());
+	if (pu32hdd_irq != -1)
+		hwdrvintctrl_ena (pu32hdd_irq, en);
 	if (en)
 		wait_event_interruptible(pu32hdd_wq, (hwdrvblkdev_rqst == 0));
 	else
@@ -94,11 +120,10 @@ static int pu32hdd_do_request (struct request *rq, unsigned int *nr_bytes) {
 		void* buf = (page_address(bvec.bv_page) + bvec.bv_offset);
 		if ((pos + bufsz) > devsz)
 			bufsz = (unsigned long)(devsz - pos);
-		unsigned long en = (hw_en && pu32hdd_ishw);
-		if (pu32_blkdev_irq != -1)
-			hwdrvintctrl_ena (pu32_blkdev_irq, (en && irq_en));
+		if (pu32hdd_irq != -1)
+			hwdrvintctrl_ena (pu32hdd_irq, (pu32hdd_param_hw_en && pu32hdd_param_irq_en));
 		unsigned long i = 0;
-		if (en) {
+		if (pu32hdd_param_hw_en) {
 			signed long ret;
 			if (rq_data_dir(rq) == WRITE) {
 				while (i < bufsz) {
@@ -172,10 +197,10 @@ static hwdrvdevtbl hwdrvdevtbl_dev = {
 	.e = (devtblentry *)0, .id = 4 /* Block device */,
 	.mapsz = 128, .addr = BLKDEVADDR, .intridx = BLKDEVINTR };
 
-void pu32_blkdev_irq_free (void) {
-	hwdrvintctrl_ena (pu32_blkdev_irq, 0);
-	free_irq (pu32_blkdev_irq, &pu32hdd_dev);
-	pu32_blkdev_irq = -1;
+void pu32hdd_irq_free (void) {
+	hwdrvintctrl_ena (pu32hdd_irq, 0);
+	free_irq (pu32hdd_irq, &pu32hdd_dev);
+	pu32hdd_irq = -1;
 }
 
 unsigned long hwdrvblkdev_init_ (void) {
@@ -183,7 +208,7 @@ unsigned long hwdrvblkdev_init_ (void) {
 	if (!hwdrvdevtbl_dev.mapsz)
 		goto out;
 	pu32hdd_ishw = 1;
-	hw_en = 1;
+	pu32hdd_param_hw_en = 1;
 	if (hwdrvdevtbl_dev.intridx != -1) {
 		int ret = request_irq (
 			hwdrvdevtbl_dev.intridx, pu32hdd_isr,
@@ -193,18 +218,18 @@ unsigned long hwdrvblkdev_init_ (void) {
 		else {
 			hwdrvblkdev_isbsy = hwdrvblkdev_isbsy_;
 			hwdrvintctrl_ena (hwdrvdevtbl_dev.intridx, 1);
-			pu32_blkdev_irq = hwdrvdevtbl_dev.intridx;
+			pu32hdd_irq = hwdrvdevtbl_dev.intridx;
 		}
 	}
 	hwdrvblkdev_dev.addr = hwdrvdevtbl_dev.addr;
 	hwdrvblkdev_rqst = 1;
 	if (!hwdrvblkdev_init (&hwdrvblkdev_dev, 0))
 		goto out_free_irq;
-	irq_en = (pu32_blkdev_irq != -1);
+	pu32hdd_param_irq_en = (pu32hdd_irq != -1);
 	return hwdrvblkdev_dev.blkcnt;
 	out_free_irq:
-	if (pu32_blkdev_irq != -1)
-		pu32_blkdev_irq_free();
+	if (pu32hdd_irq != -1)
+		pu32hdd_irq_free();
 	out:
 	return 0;
 }
@@ -252,8 +277,8 @@ static int __init pu32hdd_init (void) {
 }
 
 static void __exit pu32hdd_exit (void) {
-	if (pu32_blkdev_irq != -1)
-		pu32_blkdev_irq_free();
+	if (pu32hdd_irq != -1)
+		pu32hdd_irq_free();
 	del_gendisk(pu32hdd_dev.gd);
 	put_disk(pu32hdd_dev.gd);
 	unregister_blkdev (pu32hdd_dev.major_num, "hd");
