@@ -58,6 +58,15 @@ MODULE_PARM_DESC(hw_en, "use hw instead of bios");
 module_param_cb(irq_en, &pu32hdd_param_irq_en_ops, &pu32hdd_param_irq_en, 0644);
 MODULE_PARM_DESC(irq_en, "enable interrupt");
 
+static long pu32hdd_param_usebios = 0;
+static int __init pu32hdd_param_usebios_fn (char *buf) {
+	if (buf)
+		pu32hdd_param_usebios =
+			(buf[0] == '1' && !buf[1]);
+	return 0;
+}
+early_param ("pu32hdd_usebios", pu32hdd_param_usebios_fn);
+
 extern unsigned long pu32_ishw;
 
 // We can tweak our hardware sector size, but the kernel
@@ -235,7 +244,7 @@ unsigned long hwdrvblkdev_init_ (void) {
 }
 
 static int __init pu32hdd_init (void) {
-	if (!pu32_ishw || !(pu32hdd_dev.capacity = hwdrvblkdev_init_())) {
+	if (pu32hdd_param_usebios || !pu32_ishw || !(pu32hdd_dev.capacity = hwdrvblkdev_init_())) {
 		pu32hdd_dev.capacity = // Fallback to using BIOS.
 			pu32syslseek (PU32_BIOS_FD_STORAGEDEV, 0, SEEK_END);
 	}
