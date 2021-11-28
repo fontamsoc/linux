@@ -12,6 +12,7 @@
 
 #include <asm-generic/unistd.h>
 
-#define __NR_settls (__NR_syscalls+0)
-#define __NR_gettls (__NR_syscalls+1)
-// <asm/syscall.h> must be adjusted for new __NR_ added here.
+#define __NR_settls (__NR_arch_specific_syscall+1)
+#define __NR_gettls (__NR_arch_specific_syscall+2)
+
+// __NR_PU32_syscalls_start in <asm/syscall.h> must be adjusted for new __NR_ added here.

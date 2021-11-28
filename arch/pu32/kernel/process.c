@@ -260,7 +260,8 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 						if (pu32_in_userspace(ti)) {
 							// Syscalls from userspace.
 
-							if (syscallnr >= __NR_PU32_syscalls_start) {
+							if ((syscallnr >= __NR_syscalls) ||
+								(syscallnr >= __NR_PU32_syscalls_start && syscallnr <= __NR_PU32_syscalls_end)) {
 
 								asm volatile ("setugpr %%1, %0" :: "r"(-ENOSYS));
 								asm volatile ("getuip %%sr; inc8 %%sr, 2; setuip %%sr":);
