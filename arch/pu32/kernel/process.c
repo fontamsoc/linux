@@ -310,9 +310,9 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 								   "r"(mm->pgd));
 							asm volatile (
 								"setflags %0\n"
-								:: "r"(PU32_FLAGS_KERNELSPACE |
+								:: "r"(PU32_FLAGS_KERNELSPACE /* ARCH_IRQ_ENABLED assumed since from userspace *//*|
 									((pu32irqflags[raw_smp_processor_id()] == ARCH_IRQ_DISABLED) ?
-										PU32_FLAGS_disIntr : 0)));
+										PU32_FLAGS_disIntr : 0)*/));
 
 							goto sysret;
 
