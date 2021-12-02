@@ -9,6 +9,9 @@
 #define __HAVE_ARCH_MEMCPY
 void *memcpy (void *dest, const void *src, size_t count);
 
+#define __HAVE_ARCH_MEMSET
+void *memset (void *s, int c, size_t count);
+
 #define __HAVE_ARCH_MEMMOVE
 void *memmove (void *dest, const void *src, size_t count);
 
