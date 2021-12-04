@@ -13,8 +13,7 @@ void *uintset (void *s, int c, unsigned long cnt); __asm__ (
 	".p2align 1\n"
 	"uintset:\n"
 
-	"rli %sr, 2f\n"
-	"jz %3, %sr\n"
+	"jz %3, %rp\n"
 	"_uintset: cpy %4, %3\n"
 	"li8 %5, "__stringify(__SIZEOF_POINTER__)"\n"
 	"modu %4, %5\n"
@@ -30,9 +29,42 @@ void *uintset (void *s, int c, unsigned long cnt); __asm__ (
 	"cpy %3, %4; li8 %4, 0\n"
 	"rli %sr, _u8set\n"
 	"j %sr\n"
-	"2: j %rp\n"
 
 	".size    uintset, (. - uintset)\n");
+
+// uintset8() -> uintset().
+void *uintset_8uint_1uint (void *s, int c, unsigned long cnt8, unsigned long cnt); __asm__ (
+	".text\n"
+	".type    uintset_8uint_1uint, @function\n"
+	".p2align 1\n"
+	"uintset_8uint_1uint:\n"
+
+	"jz %3, %rp\n"
+	"_uintset8: rli %sr, 0f; 0:\n"
+	"st %2, %1\n"
+	"inc8 %1, "__stringify(__SIZEOF_POINTER__)"\n"
+	"st %2, %1\n"
+	"inc8 %1, "__stringify(__SIZEOF_POINTER__)"\n"
+	"st %2, %1\n"
+	"inc8 %1, "__stringify(__SIZEOF_POINTER__)"\n"
+	"st %2, %1\n"
+	"inc8 %1, "__stringify(__SIZEOF_POINTER__)"\n"
+	"st %2, %1\n"
+	"inc8 %1, "__stringify(__SIZEOF_POINTER__)"\n"
+	"st %2, %1\n"
+	"inc8 %1, "__stringify(__SIZEOF_POINTER__)"\n"
+	"st %2, %1\n"
+	"inc8 %1, "__stringify(__SIZEOF_POINTER__)"\n"
+	"st %2, %1\n"
+	"inc8 %1, "__stringify(__SIZEOF_POINTER__)"\n"
+	"inc8 %3, -8*"__stringify(__SIZEOF_POINTER__)"\n"
+	"jnz %3, %sr\n"
+	"jz %4, %rp\n"
+	"cpy %3, %4\n"
+	"rli %sr, _uintset\n"
+	"j %sr\n"
+
+	".size    uintset_8uint_1uint, (. - uintset_8uint_1uint)\n");
 
 // Set cnt bytes of memory area s using c.
 // If argument cnt_for_uintset is non-null, it is the number of bytes
@@ -44,8 +76,7 @@ void *u8set (void *s, int c, unsigned long cnt, unsigned long cnt_for_uintset); 
 	".p2align 1\n"
 	"u8set:\n"
 
-	"rli %sr, 1f\n"
-	"jz %3, %sr\n"
+	"jz %3, %rp\n"
 	"_u8set: rli %sr, 0f\n"
 	"0: st8 %2, %1\n"
 	"inc8 %1, 1\n"
@@ -55,9 +86,29 @@ void *u8set (void *s, int c, unsigned long cnt, unsigned long cnt_for_uintset); 
 	"cpy %3, %4\n"
 	"rli %sr, _uintset\n"
 	"j %sr\n"
-	"1: j %rp\n"
 
 	".size    u8set, (. - u8set)\n");
+
+// u8set() -> uintset8() -> uintset().
+void *u8set_1u8_8uint_1uint (void *dst, int c, unsigned long cnt, unsigned long cnt_for_uintset8, unsigned long cnt_for_uintset1); __asm__ (
+	".text\n"
+	".type    u8set_1u8_8uint_1uint, @function\n"
+	".p2align 1\n"
+	"u8set_1u8_8uint_1uint:\n"
+
+	"jz %3, %rp\n"
+	"rli %sr, 0f\n"
+	"0: st8 %2, %1\n"
+	"inc8 %1, 1\n"
+	"inc8 %3, -1\n"
+	"jnz %3, %sr\n"
+	"jz %4, %rp\n"
+	"cpy %3, %4\n"
+	"cpy %4, %5\n"
+	"rli %sr, _uintset8\n"
+	"j %sr\n"
+
+	".size    u8set_1u8_8uint_1uint, (. - u8set_1u8_8uint_1uint)\n");
 
 void *memset (void *s, int c, size_t cnt) {
 	inline unsigned int c8to32 (unsigned char c8) {
@@ -72,8 +123,19 @@ void *memset (void *s, int c, size_t cnt) {
 		unsigned long n = (sizeof(unsigned long)-x);
 		if (n > cnt)
 			u8set (s, c, cnt, 0);
-		else
-			u8set (s, c8to32(c), n, cnt-n);
+		else {
+			unsigned long cnt_for_uintset = (cnt-n);
+			if (cnt_for_uintset >= (8*sizeof(unsigned long))) {
+				unsigned long cnt_for_uintset1 = (cnt_for_uintset % (8*sizeof(unsigned long)));
+				unsigned long cnt_for_uintset8 = (cnt_for_uintset - cnt_for_uintset1);
+				u8set_1u8_8uint_1uint (s, c8to32(c), n, cnt_for_uintset8, cnt_for_uintset1); // u8set() -> uintset8() -> uintset().
+			} else
+				u8set (s, c8to32(c), n, cnt_for_uintset);
+		}
+	} else if (cnt >= (8*sizeof(unsigned long))) {
+		unsigned long cnt_for_uintset1 = (cnt % (8*sizeof(unsigned long)));
+		unsigned long cnt_for_uintset8 = (cnt - cnt_for_uintset1);
+		uintset_8uint_1uint (s, c8to32(c), cnt_for_uintset8, cnt_for_uintset1); // uintset8() -> uintset().
 	} else
 		uintset (s, c8to32(c), cnt);
 	return s;
