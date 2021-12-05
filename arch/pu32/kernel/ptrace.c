@@ -11,7 +11,7 @@ int dump_fpu (struct pt_regs *regs, elf_fpregset_t *fpu) {
         return 0; // PU32 has no separate FPU registers.
 }
 
-void show_regs (struct pt_regs *regs, const char *loglvl) {
+static void __show_regs (struct pt_regs *regs, const char *loglvl) {
 	if (regs == (struct pt_regs *)0 || regs == (struct pt_regs *)-1) {
 		// Assume coming from usermode if regs invalid pointer.
 		struct pt_regs uregs;
@@ -46,6 +46,10 @@ void show_regs (struct pt_regs *regs, const char *loglvl) {
 		regs->r8, regs->r9, regs->r10, regs->r11, regs->r12, regs->sr, regs->fp);
 }
 
+void show_regs (struct pt_regs *regs) {
+	return __show_regs (regs, KERN_DEFAULT);
+}
+
 // __attribute__((__noinline__)) forces %rp to be saved on the stack.
 __attribute__((__noinline__)) static void stacktrace (
 	unsigned long *start, unsigned long *end, const char *loglvl) {
@@ -54,7 +58,7 @@ __attribute__((__noinline__)) static void stacktrace (
 		extern char _text[];
 		if (__kernel_text_address(addr) && (addr >= (unsigned long)_text) &&
 			(*(unsigned char *)(addr-2) == 0xd2 /* jl */))
-			pr_info ("%s0x%08lx 0x%08lx %pS\n", loglvl,
+			printk ("%s0x%08lx 0x%08lx %pS\n", loglvl,
 				(unsigned long)start, addr, (void *)addr);
 		++start;
 	} while (start < end);
@@ -63,21 +67,21 @@ __attribute__((__noinline__)) static void stacktrace (
 void show_stack (struct task_struct *tsk, unsigned long *sp, const char *loglvl) {
 	if (sp) {
 		// sp is set when show_stack() is called from pu32-kernelmode.
-		pr_info ("%sstacktrace:\n", loglvl);
+		printk ("%sstacktrace(kmode):\n", loglvl);
 		asm volatile ("cpy %0, %%sp" : "=r"(sp));
 		stacktrace (sp, (unsigned long *)pu32_stack_bottom(sp), loglvl);
 		pu32FaultReason faultreason;
 		asm volatile ("getfaultreason %0\n" : "=r"(faultreason));
 		unsigned long sysopcode;
 		asm volatile ("getsysopcode %0" : "=r"(sysopcode));
-		pr_info ("%s%s: %s\n", loglvl,
+		printk ("%s%s: %s\n", loglvl,
 			pu32faultreasonstr (faultreason, 0),
 			pu32sysopcodestr (sysopcode));
 	}
 	struct thread_info *ti = current_thread_info();
 	unsigned long ksp = ti->ksp;
 	sp = ti->task->stack;
-	pr_info ("%sstacktrace:\n", loglvl);
+	printk ("%sstacktrace:\n", loglvl);
 	stacktrace (sp, (unsigned long *)ksp, loglvl);
 	unsigned iskthread = (ti->task->flags&PF_KTHREAD);
 	struct pu32_pt_regs *eos = (struct pu32_pt_regs *)pu32_stack_bottom(sp);
@@ -89,15 +93,15 @@ void show_stack (struct task_struct *tsk, unsigned long *sp, const char *loglvl)
 		} else if (ksp == (unsigned long)eos)
 			return;
 		struct pu32_pt_regs *ppr = (struct pu32_pt_regs *)ksp;
-		pr_info ("%s%s: %s\n", loglvl,
+		printk ("%s%s: %s\n", loglvl,
 			pu32faultreasonstr (ppr->faultreason, (ppr->regs.pc&1)),
 			pu32sysopcodestr (ppr->sysopcode));
-		show_regs(&ppr->regs, loglvl);
+		__show_regs(&ppr->regs, loglvl);
 		sp = (unsigned long *)(ksp + sizeof(struct pu32_pt_regs));
 		ksp = ((ksp & ~(THREAD_SIZE - 1)) +
 			((struct pu32_pt_regs *)ksp)->prev_ksp_offset);
 		if ((unsigned long)sp < ksp) {
-			pr_info ("%sstacktrace:\n", loglvl);
+			printk ("%sstacktrace:\n", loglvl);
 			stacktrace (sp, (unsigned long *)ksp, loglvl);
 		}
 	}
