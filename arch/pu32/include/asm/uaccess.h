@@ -9,8 +9,8 @@
 #define __access_ok(addr, size) \
 	((get_fs().seg == KERNEL_DS.seg) || \
 	(((unsigned long)(addr) >= FIRST_USER_ADDRESS) && \
-	((unsigned long)(addr) + (size) < USER_PGTABLES_CEILING) && \
-	((unsigned long)(addr) + (size) >= (unsigned long)(addr))))
+	(((unsigned long)(addr) + (size)) < USER_PGTABLES_CEILING) && \
+	(((unsigned long)(addr) + (size)) >= (unsigned long)(addr))))
 
 #include <asm-generic/uaccess.h>
 
