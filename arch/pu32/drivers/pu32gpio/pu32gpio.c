@@ -72,11 +72,11 @@ static const struct kernel_param_ops pu32gpio_param_use_wq_ops = {
 	.set = pu32gpio_param_use_wq_ops_set
 };
 
-module_param_cb(use_bin, &pu32gpio_param_use_bin_ops, &pu32gpio_param_use_bin, 0644);
-MODULE_PARM_DESC(use_bin, "use binary instead of text");
+module_param_cb(IOCTL_USE_BIN, &pu32gpio_param_use_bin_ops, &pu32gpio_param_use_bin, 0644);
+MODULE_PARM_DESC(IOCTL_USE_BIN, "use binary instead of text");
 
-module_param_cb(use_wq, &pu32gpio_param_use_wq_ops, &pu32gpio_param_use_wq, 0644);
-MODULE_PARM_DESC(use_wq, "use interrupt instead of polling");
+module_param_cb(IOCTL_USE_WQ, &pu32gpio_param_use_wq_ops, &pu32gpio_param_use_wq, 0644);
+MODULE_PARM_DESC(IOCTL_USE_WQ, "use interrupt instead of polling");
 
 static long pu32gpio_param_donotuse = 0;
 static int __init pu32gpio_param_donotuse_fn (char *buf) {
