@@ -213,12 +213,12 @@ void pu32hdd_irq_free (void) {
 }
 
 unsigned long hwdrvblkdev_init_ (void) {
-	//hwdrvdevtbl_find (&hwdrvdevtbl_dev); // Not needed since using conventional BLKDEVADDR BLKDEVINTR to match BIOS.
+	//hwdrvdevtbl_find (&hwdrvdevtbl_dev, NULL); // Not needed since using conventional BLKDEVADDR BLKDEVINTR to match BIOS.
 	if (!hwdrvdevtbl_dev.mapsz)
 		goto out;
 	pu32hdd_ishw = 1;
 	pu32hdd_param_hw_en = 1;
-	if (hwdrvdevtbl_dev.intridx != -1) {
+	if (hwdrvdevtbl_dev.intridx >= 0) {
 		int ret = request_irq (
 			hwdrvdevtbl_dev.intridx, pu32hdd_isr,
 			IRQF_SHARED, "pu32hdd", &((unsigned){0}));

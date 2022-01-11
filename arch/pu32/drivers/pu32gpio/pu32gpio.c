@@ -151,7 +151,7 @@ static int __init pu32gpio_init (void) {
 	devclass->dev_uevent = pu32gpio_uevent;
 	unsigned i, j;
 	for (i = 0; i < MAX_DEV_CNT; ++i) {
-		hwdrvdevtbl_find (&hwdrvdevtbl_dev);
+		hwdrvdevtbl_find (&hwdrvdevtbl_dev, NULL);
 		if (!hwdrvdevtbl_dev.mapsz)
 			break;
 		char str[16];
@@ -176,7 +176,7 @@ static int __init pu32gpio_init (void) {
 				NULL,
 				(j>0) ? "%s%u" : "%s", str, (j-1));
 		init_waitqueue_head (&pu32gpio_devdata[i].wq);
-		if (hwdrvdevtbl_dev.intridx != -1) {
+		if (hwdrvdevtbl_dev.intridx >= 0) {
 			int ret = request_irq (
 				hwdrvdevtbl_dev.intridx, pu32gpio_isr,
 				IRQF_SHARED, "pu32gpio", &pu32gpio_devdata[i]);

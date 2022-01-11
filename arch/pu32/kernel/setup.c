@@ -113,7 +113,7 @@ __attribute__((noreturn)) void __init pu32_start (char **argv, char **envp) {
 		}
 
 		hwdrvdevtbl hwdrvdevtbl_dev = {.e = (devtblentry *)0, .id = 1 /* RAM device */};
-		hwdrvdevtbl_find (&hwdrvdevtbl_dev);
+		hwdrvdevtbl_find (&hwdrvdevtbl_dev, NULL);
 		if (!hwdrvdevtbl_dev.mapsz) {
 			pu32stdout("memory not found\n");
 			while(1); }

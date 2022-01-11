@@ -176,8 +176,9 @@ static const struct tty_operations tty_console_ops = {
 static hwdrvdevtbl hwdrvdevtbl_dev = {.e = (devtblentry *)0, .id = 5 /* Character device */};
 
 void hwchardev_init (void) {
-	hwdrvdevtbl_find (&hwdrvdevtbl_dev);
-	if ((pu32_ttys_irq = hwdrvdevtbl_dev.intridx) != -1) {
+	hwdrvdevtbl_find (&hwdrvdevtbl_dev, NULL);
+	pu32_ttys_irq = ((hwdrvdevtbl_dev.intridx < 0) ? -1 : hwdrvdevtbl_dev.intridx);
+	if (pu32_ttys_irq != -1) {
 		hwdrvchar_dev.addr = hwdrvdevtbl_dev.addr;
 		hwdrvchar_init (&hwdrvchar_dev, 115200);
 	}
