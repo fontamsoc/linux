@@ -15,6 +15,7 @@
 #include <asm/cpuinfo.h>
 
 #include <pu32.h>
+#include <hwdrvdevtbl.h>
 
 #if defined(CONFIG_NODES_SHIFT) && (CONFIG_NR_CPUS != (1<<CONFIG_NODES_SHIFT))
 #error NODES_SHIFT is invalid
@@ -27,6 +28,186 @@ unsigned long pu32_TASK_UNMAPPED_BASE;
 
 unsigned long pu32_ishw = 0;
 unsigned long pu32_bios_end = KERNELADDR;
+
+static struct resource kimage_res = { .name = "Kernel image", };
+static struct resource code_res = { .name = "Kernel code", };
+static struct resource data_res = { .name = "Kernel data", };
+static struct resource rodata_res = { .name = "Kernel rodata", };
+static struct resource rwdata_res = { .name = "Kernel rwdata", };
+static struct resource bss_res = { .name = "Kernel bss", };
+
+static int __init add_resource (struct resource *parent, struct resource *res) {
+	int ret = 0;
+	ret = insert_resource (parent, res);
+	if (ret < 0) {
+		pr_err("Failed to add a %s resource at %x\n", res->name, res->start);
+		return ret;
+	}
+	return 1;
+}
+
+static int __init add_kernel_resources (void) {
+
+	kimage_res.start = (unsigned long)_stext;
+	kimage_res.end = (unsigned long)_end;
+	kimage_res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+
+	code_res.start = (unsigned long)_text;
+	code_res.end = (unsigned long)_etext - 1;
+	code_res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+
+	data_res.start = (unsigned long)_sdata;
+	data_res.end = (unsigned long)_edata - 1;
+	data_res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+
+	rodata_res.start = (unsigned long)__start_rodata;
+	rodata_res.end = (unsigned long)__end_rodata - 1;
+	rodata_res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+
+	extern char __start_rwdata[], __end_rwdata[];
+	rwdata_res.start = (unsigned long)__start_rwdata;
+	rwdata_res.end = (unsigned long)__end_rwdata - 1;
+	rwdata_res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+
+	bss_res.start = (unsigned long)__bss_start;
+	bss_res.end = (unsigned long)__bss_stop - 1;
+	bss_res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+
+	int ret = add_resource(&iomem_resource, &kimage_res);
+	if (ret < 0)
+		return ret;
+
+	ret = add_resource(&kimage_res, &code_res);
+	if (ret < 0)
+		return ret;
+
+	ret = add_resource(&kimage_res, &data_res);
+	if (ret < 0)
+		return ret;
+
+	ret = add_resource(&data_res, &rodata_res);
+	if (ret < 0)
+		return ret;
+
+	ret = add_resource(&data_res, &rwdata_res);
+	if (ret < 0)
+		return ret;
+
+	ret = add_resource(&rwdata_res, &bss_res);
+
+	return ret;
+}
+
+static char *pu32devidtoname[] = {
+	 [0] = "Void"
+	,[1] = "RAM"
+	,[2] = "DMA"
+	,[3] = "IntCtrl"
+	,[4] = "BlkDev"
+	,[5] = "CharDev"
+	,[6] = "GPIO"
+	,[7] = "DevTbl"
+	,[8] = "SpiMaster"
+	,[9] = "PDM"
+};
+
+static void __init init_resources (void) {
+	// Count devices mapped in physical address space.
+	unsigned long devcnt = 0;
+	if (pu32_ishw) {
+		hwdrvdevtbl hwdrvdevtbl_dev = {.e = (devtblentry *)0, .id = -1};
+		while (hwdrvdevtbl_find (&hwdrvdevtbl_dev, (void *)-1), hwdrvdevtbl_dev.mapsz)
+			devcnt += 1;
+	} else
+		devcnt += 1;
+
+	// We should use +1 as memblock_alloc() might increase memblock.reserved.cnt,
+	// but since devcnt needs to be decremented for RAM device at 0x1000, it is omitted.
+	unsigned long num_resources = memblock.memory.cnt + memblock.reserved.cnt + devcnt;
+	unsigned long res_idx = num_resources -1;
+
+	struct resource *mem_res;
+	size_t mem_res_sz = num_resources * sizeof(*mem_res);
+	if (!(mem_res = memblock_alloc(mem_res_sz, L1_CACHE_BYTES)))
+		panic("%s: Failed to allocate %u bytes\n", __func__, mem_res_sz);
+
+	// Start by adding the reserved regions, if they overlap with
+	// memory regions, insert_resource() will later on take care of it.
+	if (add_kernel_resources() < 0)
+		goto err;
+
+	struct resource *res = NULL;
+
+	struct memblock_region *region = NULL;
+	for_each_reserved_mem_region(region) {
+		res = &mem_res[res_idx--];
+
+		res->name = "Reserved";
+		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+		res->start = __pfn_to_phys(memblock_region_reserved_base_pfn(region));
+		res->end = __pfn_to_phys(memblock_region_reserved_end_pfn(region)) - 1;
+
+		// Ignore any other reserved regions within system memory.
+		if (memblock_is_memory(res->start)) {
+			// Re-use this pre-allocated resource.
+			++res_idx;
+			continue;
+		}
+
+		if (add_resource(&iomem_resource, res) < 0)
+			goto err;
+	}
+
+	// Add memory regions to the resource tree.
+	for_each_mem_region(region) {
+		res = &mem_res[res_idx--];
+
+		if (memblock_is_nomap(region)) {
+			res->name = "Reserved";
+			res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+		} else {
+			res->name = "System RAM";
+			res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+		}
+
+		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
+		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
+
+		if (add_resource(&iomem_resource, res) < 0)
+			goto err;
+	}
+
+	if (pu32_ishw) {
+		hwdrvdevtbl hwdrvdevtbl_dev = {.e = (devtblentry *)0, .id = -1};
+		while (hwdrvdevtbl_find (&hwdrvdevtbl_dev, (void *)-1), hwdrvdevtbl_dev.mapsz) {
+
+			if (hwdrvdevtbl_dev.addr == (void *)0x1000)
+				continue; // Skip RAM Device at 0x1000 which is "System RAM",
+				          // and which was not counted in num_resources.
+
+			res = &mem_res[res_idx--];
+
+			res->name = (hwdrvdevtbl_dev.id < (sizeof(pu32devidtoname)/sizeof(pu32devidtoname[0]))) ? pu32devidtoname[hwdrvdevtbl_dev.id]: "UnkownDevID";
+			res->flags = ((hwdrvdevtbl_dev.id == 1) ? IORESOURCE_MEM : IORESOURCE_IO) | IORESOURCE_BUSY;
+			res->start = (unsigned long)hwdrvdevtbl_dev.addr;
+			res->end = (unsigned long)hwdrvdevtbl_dev.addr + ((hwdrvdevtbl_dev.mapsz * sizeof(unsigned long)) - 1);
+
+			if (add_resource(&iomem_resource, res) < 0)
+				goto err;
+		}
+	}
+
+	// Clean-up any unused pre-allocated resources.
+	mem_res_sz = (res_idx + 1);
+	if (mem_res_sz)
+		memblock_free((unsigned long)mem_res, mem_res_sz * sizeof(*mem_res));
+	return;
+
+ err:
+	// Better an empty resource tree than an inconsistent one.
+	release_child_resources(&iomem_resource);
+	memblock_free((unsigned long)mem_res, mem_res_sz);
+}
 
 #ifdef CONFIG_SMP
 void __init setup_smp (void);
@@ -71,6 +252,8 @@ void __init setup_arch (char **cmdline_p) {
 
 	pr_info("Virt. mem: %ldMB\n", (TASK_SIZE - TASK_UNMAPPED_BASE)/1024/1024);
 
+	init_resources();
+
 	#ifdef CONFIG_SMP
 	setup_smp();
 	#endif
@@ -78,7 +261,6 @@ void __init setup_arch (char **cmdline_p) {
 
 void __init trap_init (void) {}
 
-#include <hwdrvdevtbl.h>
 #define DEVTBLADDR (0x200 /* By convention, the device table is located at 0x200 */)
 
 __attribute__((noreturn)) void __init pu32_start (char **argv, char **envp) {
