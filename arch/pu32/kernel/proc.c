@@ -27,6 +27,9 @@ void c_setup (void) { // Best called before setting cpu online.
 	unsigned long dcache;
 	asm volatile ("getdcachesize %0\n" : "=r"(dcache));
 
+	unsigned long tlbsz;
+	asm volatile ("gettlbsize %0" : "=r"(tlbsz));
+
 	unsigned long coreid;
 	asm volatile ("getcoreid %0\n" : "=r"(coreid));
 
@@ -37,6 +40,7 @@ void c_setup (void) { // Best called before setting cpu online.
 	c_info[coreid].freq = (freq / 1000000);
 	c_info[coreid].icache = (icache * sizeof(unsigned long) / 1024);
 	c_info[coreid].dcache = (dcache * sizeof(unsigned long) / 1024);
+	c_info[coreid].tlbsz = tlbsz;
 }
 
 // /proc/cpuinfo callbacks.
@@ -61,6 +65,7 @@ static int c_show (struct seq_file *m, void *v) {
 		seq_printf(m, "cpu-MHz       : %ld\n", c_info[i].freq);
 		seq_printf(m, "cpu-icache-KB : %ld\n", c_info[i].icache);
 		seq_printf(m, "cpu-dcache-KB : %ld\n", c_info[i].dcache);
+		seq_printf(m, "cpu-tlbsz     : %ld\n", c_info[i].tlbsz);
 		seq_printf(m, "ram-cache-KB  : %ld\n", c_info_rcache);
 	}
 

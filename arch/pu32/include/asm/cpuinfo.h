@@ -12,6 +12,7 @@ struct c_info {
 	unsigned long freq; // In MHz.
 	unsigned long icache; // In KB.
 	unsigned long dcache; // In KB.
+	unsigned long tlbsz;
 };
 
 extern struct c_info c_info[NR_CPUS];
