@@ -27,8 +27,9 @@ unsigned long pu32_mem_end_high;
 unsigned long pu32_TASK_UNMAPPED_BASE;
 
 unsigned long pu32_ishw = 0;
-unsigned long pu32_bios_end = KERNELADDR;
+unsigned long pu32_bios_end = PAGE_SIZE;
 
+static struct resource bios_res = { .name = "BIOS", };
 static struct resource kimage_res = { .name = "Kernel image", };
 static struct resource code_res = { .name = "Kernel code", };
 static struct resource data_res = { .name = "Kernel data", };
@@ -47,6 +48,18 @@ static int __init add_resource (struct resource *parent, struct resource *res) {
 }
 
 static int __init add_kernel_resources (void) {
+
+	int ret;
+
+	if (pu32_bios_end > pu32_mem_start) {
+		bios_res.start = (unsigned long)pu32_mem_start;
+		bios_res.end = (unsigned long)pu32_bios_end - 1;
+		bios_res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+
+		ret = add_resource(&iomem_resource, &bios_res);
+		if (ret < 0)
+			return ret;
+	}
 
 	kimage_res.start = (unsigned long)_stext;
 	kimage_res.end = (unsigned long)_end;
@@ -73,7 +86,7 @@ static int __init add_kernel_resources (void) {
 	bss_res.end = (unsigned long)__bss_stop - 1;
 	bss_res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
 
-	int ret = add_resource(&iomem_resource, &kimage_res);
+	ret = add_resource(&iomem_resource, &kimage_res);
 	if (ret < 0)
 		return ret;
 
@@ -226,8 +239,10 @@ void __init setup_arch (char **cmdline_p) {
 
 	/* memblock_init(void) */ {
 		memblock_add(pu32_mem_start, pu32_mem_end - pu32_mem_start);
-		if (pu32_bios_end < KERNELADDR)
-			memblock_reserve((unsigned long)PAGE_SIZE, (unsigned long)pu32_bios_end - (unsigned long)PAGE_SIZE);
+		if (pu32_bios_end > pu32_mem_start)
+			memblock_reserve(pu32_mem_start, pu32_bios_end - pu32_mem_start);
+		if (pu32_bios_end < (KERNELADDR - PAGE_SIZE)) // Reserve page holding parkpu().
+			memblock_reserve((KERNELADDR - PAGE_SIZE), PAGE_SIZE);
 		memblock_reserve((unsigned long)_stext, (unsigned long)_end - (unsigned long)_stext);
 		min_low_pfn = PFN_UP(pu32_mem_start);
 		max_low_pfn = PFN_DOWN(pu32_mem_end);
@@ -323,6 +338,9 @@ __attribute__((noreturn)) void __init pu32_start (char **argv, char **envp) {
 			pu32stdout("memory not found\n");
 			while(1);
 		}
+
+		// Update where BIOS ends in memory.
+		pu32_bios_end = pu32_mem_start;
 
 		c_info_rcache = 0;
 	}
