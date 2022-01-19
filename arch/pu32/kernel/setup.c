@@ -112,7 +112,7 @@ static int __init add_kernel_resources (void) {
 }
 
 static char *pu32devidtoname[] = {
-	 [0] = "Void"
+	 [0] = "Reserved"
 	,[1] = "RAM"
 	,[2] = "DMA"
 	,[3] = "IntCtrl"
