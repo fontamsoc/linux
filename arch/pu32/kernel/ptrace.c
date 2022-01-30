@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // (c) William Fonkou Tambe
 
+#include <linux/elf.h>
 #include <linux/ptrace.h>
+#include <linux/regset.h>
 
 #include <asm/elf.h>
 #include <asm/ptrace.h>
@@ -124,4 +126,43 @@ long arch_ptrace (
 		break;
 	}
 	return ret;
+}
+
+static int pu32_regset_get (
+	struct task_struct *target,
+	const struct user_regset *regset,
+	struct membuf to) {
+	return membuf_write(&to, task_pt_regs(target), sizeof(struct pt_regs));
+}
+
+static int pu32_regset_set (
+	struct task_struct *target,
+	const struct user_regset *regset,
+	unsigned int pos, unsigned int count,
+	const void *kbuf, const void __user *ubuf) {
+	struct pt_regs *regs = task_pt_regs(target);
+	return user_regset_copyin(&pos, &count, &kbuf, &ubuf, regs, 0, -1);
+}
+
+static const struct user_regset pu32_regsets[] = {
+	[0] = {
+		.core_note_type = NT_PRSTATUS,
+		.n = ELF_NGREG,
+		.size = sizeof(elf_greg_t),
+		.align = sizeof(elf_greg_t),
+		.regset_get = pu32_regset_get,
+		.set = pu32_regset_set,
+	},
+};
+
+static const struct user_regset_view user_pu32_view = {
+	.name           = "pu32",
+	.e_machine      = ELF_ARCH,
+	.ei_osabi       = ELF_OSABI,
+	.regsets        = pu32_regsets,
+	.n              = ARRAY_SIZE(pu32_regsets)
+};
+
+const struct user_regset_view *task_user_regset_view (struct task_struct *task) {
+	return &user_pu32_view;
 }

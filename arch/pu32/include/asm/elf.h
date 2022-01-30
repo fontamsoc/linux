@@ -22,6 +22,7 @@
 #define ELF_ARCH	EM_PU32
 #define ELF_CLASS	ELFCLASS32
 #define ELF_DATA	ELFDATA2LSB
+#define ELF_OSABI 	ELFOSABI_NONE
 
 // Used to ensure we don't load something for the wrong architecture.
 #define elf_check_arch(x) ((x)->e_machine == EM_PU32)
@@ -38,7 +39,8 @@
 #define ELF_HWCAP 0
 #define ELF_PLATFORM  (NULL)
 
-//#define CORE_DUMP_USE_REGSET
+#define CORE_DUMP_USE_REGSET
+
 typedef unsigned long elf_greg_t;
 #define ELF_NGREG (sizeof(struct pt_regs) / sizeof(elf_greg_t))
 typedef elf_greg_t elf_gregset_t[ELF_NGREG];
