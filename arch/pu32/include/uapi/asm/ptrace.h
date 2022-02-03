@@ -24,4 +24,6 @@ struct pt_regs {
 	unsigned long pc;
 };
 
+#define PTRACE_GET_THREAD_AREA 25
+
 #endif /* __UAPI_ASM_PU32_PTRACE_H */

@@ -121,10 +121,13 @@ long arch_ptrace (
 	unsigned long data) {
 	int ret;
 	switch (request) {
-	default:
-		ret = ptrace_request(child, request, addr, data);
-		break;
-	}
+		case PTRACE_GET_THREAD_AREA:
+			ret = put_user(task_thread_info(child)->tls, (unsigned long __user *)data);
+			break;
+		default:
+			ret = ptrace_request(child, request, addr, data);
+			break;
+		}
 	return ret;
 }
 
