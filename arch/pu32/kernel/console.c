@@ -8,228 +8,339 @@
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/string.h>
 
 #include <pu32.h>
-
-#include <hwdrvchar.h>
-static hwdrvchar hwdrvchar_dev;
-
+#include <hwdrvdevtbl.h>
 #include <hwdrvintctrl.h>
+#include <hwdrvchar.h>
+
+#define PU32TTY_CNT_MAX 8
+#define PU32TTY_POLL_DELAY (HZ / 100)
+
+typedef struct {
+	struct console console;
+	struct tty_port port;
+	struct timer_list timer;
+	hwdrvchar hw;
+	unsigned long irq;
+	struct list_head list;
+} pu32tty_dev_t;
+
+static LIST_HEAD(pu32tty_devs);
 
 extern unsigned long pu32_ishw;
 
-static unsigned long pu32_ttys_irq = -1;
-
 #ifdef CONFIG_SMP
-static DEFINE_SPINLOCK(tty_console_lock);
+static DEFINE_SPINLOCK(pu32tty_lock);
 #endif
 
-static void tty_console_write (
+static void pu32tty_write (
 	struct console *con, const char *s, unsigned n) {
 	unsigned long flags;
 	raw_local_irq_save(flags);
 	#ifdef CONFIG_SMP
-	spin_lock(&tty_console_lock);
+	spin_lock(&pu32tty_lock);
 	#endif
 	unsigned long i;
-	if (pu32_ttys_irq != -1 && pu32_ishw) {
+	pu32tty_dev_t *dev = container_of(con, pu32tty_dev_t, console);
+	if (dev->irq != -1 && pu32_ishw) {
 		for (i = 0; i < n;)
-			i += hwdrvchar_write_ (&hwdrvchar_dev, (void *)s+i, n-i);
+			i += hwdrvchar_write_ (&dev->hw, (void *)s+i, n-i);
 	} else {
 		for (i = 0; i < n;)
 			i += pu32syswrite (PU32_BIOS_FD_STDOUT, (void *)s+i, n-i);
 	}
 	#ifdef CONFIG_SMP
-	spin_unlock(&tty_console_lock);
+	spin_unlock(&pu32tty_lock);
 	#endif
 	raw_local_irq_restore(flags);
 }
 
-static struct tty_driver *tty_console_driver;
+static struct tty_driver *pu32tty_driver;
 
-static struct tty_driver * tty_console_device (
+static struct tty_driver * pu32tty_device (
 	struct console *con, int *idx) {
 	*idx = con->index;
-	return tty_console_driver;
+	return pu32tty_driver;
 }
 
-static struct console tty_console = {
-	.name	= "ttyS",
-	.write	= tty_console_write,
-	.device = tty_console_device,
-	.flags	= CON_PRINTBUFFER,
-	.index	= -1
-};
-
-static struct tty_port tty_console_port;
-
-static void tty_console_poll (struct timer_list *_);
-static DEFINE_TIMER (tty_console_timer, tty_console_poll);
-#define TTY_CONSOLE_POLL_DELAY (HZ / 100)
-
-static void tty_console_poll (struct timer_list *_) {
+static void pu32tty_poll (struct timer_list *timer) {
 	unsigned char c;
 	unsigned long n = 0;
+	pu32tty_dev_t *dev = container_of(timer, pu32tty_dev_t, timer);
 	while (pu32sysread (PU32_BIOS_FD_STDIN, &c, 1)) {
-		tty_insert_flip_char (&tty_console_port, c, TTY_NORMAL);
+		tty_insert_flip_char (&dev->port, c, TTY_NORMAL);
 		++n;
 	}
 	if (n)
-		tty_flip_buffer_push(&tty_console_port);
-	if (pu32_ttys_irq != -1) {
+		tty_flip_buffer_push(&dev->port);
+	if (dev->irq != -1) {
 		if (pu32_ishw)
-			hwdrvchar_interrupt (&hwdrvchar_dev, 1); // Resume using interrupt instead.
+			hwdrvchar_interrupt (&dev->hw, 1); // Resume using interrupt instead.
 	} else
-		mod_timer (&tty_console_timer, jiffies + TTY_CONSOLE_POLL_DELAY);
+		mod_timer (&dev->timer, jiffies + PU32TTY_POLL_DELAY);
 }
 
-static irqreturn_t tty_console_isr (int _, void *__) {
+static irqreturn_t pu32tty_isr (int irq, void *dev_id) {
 	unsigned char c;
 	unsigned long n = 0;
+	pu32tty_dev_t *dev = (pu32tty_dev_t *)dev_id;
 	unsigned long hwchardev_read (void) {
-		if (pu32_ttys_irq != -1 && pu32_ishw)
-			return hwdrvchar_read (&hwdrvchar_dev, &c, 1);
+		if (dev->irq != -1 && pu32_ishw)
+			return hwdrvchar_read (&dev->hw, &c, 1);
 		else
 			return pu32sysread (PU32_BIOS_FD_STDIN, &c, 1);
 	}
 	while (hwchardev_read()) {
-		tty_insert_flip_char (&tty_console_port, c, TTY_NORMAL);
+		tty_insert_flip_char (&dev->port, c, TTY_NORMAL);
 		++n;
 	}
 	if (n)
-		tty_flip_buffer_push(&tty_console_port);
+		tty_flip_buffer_push(&dev->port);
 	static unsigned long expires = 0;
-	if (pu32_ttys_irq != -1 && jiffies >= expires) {
-		expires = (jiffies + TTY_CONSOLE_POLL_DELAY);
+	if (dev->irq != -1 && jiffies >= expires) {
+		expires = (jiffies + PU32TTY_POLL_DELAY);
 		if (pu32_ishw)
-			hwdrvchar_interrupt (&hwdrvchar_dev, 1);
+			hwdrvchar_interrupt (&dev->hw, 1);
 	} else { // Preventing too frequent interrupts.
-		expires = (jiffies + TTY_CONSOLE_POLL_DELAY);
-		mod_timer (&tty_console_timer, expires);
+		expires = (jiffies + PU32TTY_POLL_DELAY);
+		mod_timer (&dev->timer, expires);
 	}
 	return IRQ_HANDLED;
 }
 
-static int tty_console_ops_open (struct tty_struct *tty, struct file *filp) {
-	tty_port_tty_set (tty->port, tty);
-	// Flush stdin.
-	if (pu32_ttys_irq != -1 && pu32_ishw)
-		while (hwdrvchar_read (&hwdrvchar_dev, &((char){0}), 1));
-	else
-		while (pu32sysread (PU32_BIOS_FD_STDIN, &((char){0}), 1));
+static int pu32tty_tty_ops_open (struct tty_struct *tty, struct file *filp) {
 	if (tty->count > 1)
 		return 0;
-	if (pu32_ttys_irq != -1) {
-		int ret = request_irq (
-			pu32_ttys_irq, tty_console_isr,
-			IRQF_SHARED, "ttyS", tty);
-		if (ret) {
-			pr_err("request_irq(%lu) == %d\n", pu32_ttys_irq, ret);
-			tty_port_tty_set (tty->port, NULL);
-		} else if (pu32_ishw) {
-			hwdrvchar_interrupt (&hwdrvchar_dev, 1);
-			hwdrvintctrl_ena (pu32_ttys_irq, 1);
-		}
+	int ret = tty_port_open(tty->port, tty, filp);
+	if (ret)
 		return ret;
-	} else {
-		mod_timer (&tty_console_timer, jiffies + TTY_CONSOLE_POLL_DELAY);
-		return 0;
-	}
+	pu32tty_dev_t *dev = container_of(tty->port, pu32tty_dev_t, port);
+	// Flush stdin.
+	if (dev->irq != -1 && pu32_ishw)
+		while (hwdrvchar_read (&dev->hw, &((char){0}), 1));
+	else
+		while (pu32sysread (PU32_BIOS_FD_STDIN, &((char){0}), 1));
+	if (dev->irq != -1) {
+		ret = request_irq (
+			dev->irq, pu32tty_isr,
+			IRQF_SHARED, "ttyS", dev);
+		if (ret) {
+			pr_err("request_irq(%lu) == %d\n", dev->irq, ret);
+			tty_port_close(tty->port, tty, filp);
+		} else if (pu32_ishw) {
+			hwdrvchar_interrupt (&dev->hw, 1);
+			hwdrvintctrl_ena (dev->irq, 1);
+		}
+	} else
+		mod_timer (&dev->timer, jiffies + PU32TTY_POLL_DELAY);
+	return ret;
 }
 
-static void tty_console_ops_close (struct tty_struct *tty, struct file *filp) {
-	if (tty->count == 1) {
-		if (pu32_ttys_irq != -1) {
-			hwdrvintctrl_ena (pu32_ttys_irq, 0);
-			hwdrvchar_interrupt (&hwdrvchar_dev, 0);
-			free_irq (pu32_ttys_irq, tty);
-		} else
-			del_timer_sync(&tty_console_timer);
-		tty_port_tty_set (tty->port, NULL);
-	}
+static void pu32tty_tty_ops_close (struct tty_struct *tty, struct file *filp) {
+	if (tty->count != 1)
+		return;
+	pu32tty_dev_t *dev = container_of(tty->port, pu32tty_dev_t, port);
+	if (dev->irq != -1) {
+		hwdrvintctrl_ena (dev->irq, 0);
+		hwdrvchar_interrupt (&dev->hw, 0);
+		free_irq (dev->irq, dev);
+	} else
+		del_timer_sync(&dev->timer);
+	tty_port_close(tty->port, tty, filp);
 }
 
-static int tty_console_ops_write (struct tty_struct *tty, const unsigned char *s, int n) {
-	tty_console_write (NULL, s, n);
+static void pu32tty_tty_ops_hangup (struct tty_struct *tty) {
+	tty_port_hangup(tty->port);
+}
+
+static int pu32tty_tty_ops_write (struct tty_struct *tty, const unsigned char *s, int n) {
+	pu32tty_dev_t *dev = container_of(tty->port, pu32tty_dev_t, port);
+	pu32tty_write (&dev->console, s, n);
 	return n;
 }
 
-static int tty_console_ops_write_room (struct tty_struct *tty) {
+static int pu32tty_tty_ops_write_room (struct tty_struct *tty) {
 	return 32768; // No limit, no buffer used.
 }
 
-static int tty_console_chars_in_buffer (struct tty_struct *tty) {
+static int pu32tty_chars_in_buffer (struct tty_struct *tty) {
 	return 0; // No buffer.
 }
 
-static const struct tty_operations tty_console_ops = {
-	.open = tty_console_ops_open,
-	.close = tty_console_ops_close,
-	.write = tty_console_ops_write,
-	.write_room = tty_console_ops_write_room,
-	.chars_in_buffer = tty_console_chars_in_buffer,
+static const struct tty_port_operations pu32tty_port_ops = {
+	.activate = 0,
+	.shutdown = 0
 };
 
-#include <hwdrvdevtbl.h>
+static const struct tty_operations pu32tty_tty_ops = {
+	.open = pu32tty_tty_ops_open,
+	.close = pu32tty_tty_ops_close,
+	.hangup = pu32tty_tty_ops_hangup,
+	.write = pu32tty_tty_ops_write,
+	.write_room = pu32tty_tty_ops_write_room,
+	.chars_in_buffer = pu32tty_chars_in_buffer,
+};
+
 static hwdrvdevtbl hwdrvdevtbl_dev = {.e = (devtblentry *)0, .id = 5 /* Character device */};
 
-void hwchardev_init (void) {
-	hwdrvdevtbl_find (&hwdrvdevtbl_dev, NULL);
-	pu32_ttys_irq = ((hwdrvdevtbl_dev.intridx < 0) ? -1 : hwdrvdevtbl_dev.intridx);
-	if (pu32_ttys_irq != -1) {
-		hwdrvchar_dev.addr = hwdrvdevtbl_dev.addr;
-		hwdrvchar_init (&hwdrvchar_dev, 115200);
-	}
-}
+// Expect pu32tty_dev_t fields hw, irq to have been set.
+static int pu32tty_add (pu32tty_dev_t *dev) {
 
-static int __init tty_console_driver_init (void) {
-
-	struct console *tmp;
+	struct console *con;
 	console_lock();
-	for_each_console(tmp)
-		if (tmp == &tty_console)
+	for_each_console(con) {
+		if (con == &dev->console)
 			break;
-	console_unlock();
-	if (!tmp)
-		register_console(&tty_console);
-	tty_console.flags &= ~CON_BOOT;
-
-	tty_console_driver = alloc_tty_driver(1);
-
-	if (!tty_console_driver)
-		return -ENOMEM;
-
-	tty_console_driver->driver_name = "pu32tty";
-	tty_console_driver->name = "ttyS";
-	tty_console_driver->major = TTY_MAJOR;
-	tty_console_driver->minor_start = 64;
-	tty_console_driver->type = TTY_DRIVER_TYPE_SERIAL;
-	tty_console_driver->subtype = SERIAL_TYPE_NORMAL;
-	tty_console_driver->init_termios = tty_std_termios;
-	tty_console_driver->init_termios.c_cflag |= CLOCAL;
-	tty_console_driver->flags = TTY_DRIVER_REAL_RAW;
-	tty_set_operations (tty_console_driver, &tty_console_ops);
-	tty_port_init(&tty_console_port);
-	tty_port_link_device (&tty_console_port, tty_console_driver, 0);
-
-	if (pu32_ishw) {
-		if (pu32_ttys_irq == -1)
-			hwchardev_init();
-	} else
-		pu32_ttys_irq = PU32_VM_IRQ_TTYS0;
-
-	int err = tty_register_driver(tty_console_driver);
-	if (err) {
-		pr_err("unable to register console TTY driver\n");
-		tty_port_destroy(&tty_console_port);
-		return err;
 	}
+	console_unlock();
+	if (!con) {
+		if (!dev->console.device) {
+			strcpy(dev->console.name, "ttyS");
+			dev->console.write = pu32tty_write;
+			dev->console.device = pu32tty_device;
+			dev->console.flags = CON_PRINTBUFFER;
+			unsigned long index;
+			for (index = 1; index < PU32TTY_CNT_MAX; ++index) {
+				pu32tty_dev_t *d, *n, *found = 0;
+				list_for_each_entry_safe (d, n, &pu32tty_devs, list) {
+					if (d->console.index == index) {
+						found = d;
+						break;
+					}
+				}
+				if (!found)
+					break;
+			}
+			if (index == PU32TTY_CNT_MAX)
+				return -EBUSY;
+			dev->console.index = index;
+		}
+		register_console(&dev->console);
+	}
+	dev->console.flags &= ~CON_BOOT;
+
+	tty_port_init(&dev->port);
+	dev->port.ops = &pu32tty_port_ops;
+	struct device *ttydev = tty_port_register_device( // Instead of tty_port_link_device() due to TTY_DRIVER_DYNAMIC_DEV.
+		&dev->port, pu32tty_driver, dev->console.index, NULL);
+	if (IS_ERR(ttydev)) {
+		int ret = PTR_ERR(ttydev);
+		unregister_console(con);
+		pr_err("unable to register TTY port: ret(%d)\n", ret);
+		return ret;
+	}
+
+	timer_setup(&dev->timer, pu32tty_poll, 0);
 
 	return 0;
 }
-device_initcall(tty_console_driver_init);
+
+static void pu32tty_remove (pu32tty_dev_t *dev) {
+	unregister_console(&dev->console);
+	tty_unregister_device(pu32tty_driver, dev->console.index);
+	tty_port_destroy(&dev->port);
+	list_del(&dev->list);
+	kfree(dev);
+}
+
+static pu32tty_dev_t pu32tty_dev0 = {
+	.console = {
+		.name   = "ttyS",
+		.write  = pu32tty_write,
+		.device = pu32tty_device,
+		.flags  = CON_PRINTBUFFER,
+		.index  = 0
+	},
+	.hw = {
+		.addr = 0
+	},
+	.irq = -1
+};
+
+static int __init pu32tty_create_driver (void) {
+
+	int ret;
+
+	pu32tty_driver = alloc_tty_driver(PU32TTY_CNT_MAX);
+
+	if (!pu32tty_driver) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	pu32tty_driver->driver_name = "pu32tty";
+	pu32tty_driver->name = "ttyS";
+	pu32tty_driver->major = TTY_MAJOR;
+	pu32tty_driver->minor_start = 64;
+	pu32tty_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	pu32tty_driver->subtype = SERIAL_TYPE_NORMAL;
+	pu32tty_driver->init_termios = tty_std_termios;
+	pu32tty_driver->init_termios.c_cflag |= CLOCAL;
+	pu32tty_driver->flags = (TTY_DRIVER_RESET_TERMIOS | TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV);
+	tty_set_operations (pu32tty_driver, &pu32tty_tty_ops);
+
+	ret = tty_register_driver(pu32tty_driver);
+	if (ret) {
+		pr_err("unable to register console TTY driver\n");
+		goto err_put_tty_driver;
+	}
+
+	pu32tty_dev_t *dev = &pu32tty_dev0;
+
+	if (pu32_ishw) {
+
+		while (1) {
+
+			ret = pu32tty_add(dev);
+			if (ret)
+				goto err_tty_unregister_driver;
+			list_add_tail(&dev->list, &pu32tty_devs);
+
+			hwdrvdevtbl_find (&hwdrvdevtbl_dev, NULL);
+			if (hwdrvdevtbl_dev.mapsz) {
+				dev = kzalloc(sizeof(pu32tty_dev_t), GFP_KERNEL);
+				dev->irq = ((hwdrvdevtbl_dev.intridx < 0) ? -1 : hwdrvdevtbl_dev.intridx);
+				dev->hw.addr = hwdrvdevtbl_dev.addr;
+				hwdrvchar_init (&dev->hw, 115200);
+			} else
+				break;
+		}
+
+	} else {
+		dev->irq = PU32_VM_IRQ_TTYS0;
+		ret = pu32tty_add(dev);
+		if (ret)
+			goto err_tty_unregister_driver;
+		list_add_tail(&dev->list, &pu32tty_devs);
+	}
+
+	return 0;
+
+	err_tty_unregister_driver:;
+	pu32tty_dev_t *n;
+	list_for_each_entry_safe (dev, n, &pu32tty_devs, list)
+		pu32tty_remove(dev);
+	tty_unregister_driver(pu32tty_driver);
+	err_put_tty_driver:
+	put_tty_driver(pu32tty_driver);
+	err:
+
+	return ret;
+}
+module_init(pu32tty_create_driver);
+
+static void pu32tty_destroy_driver (void) {
+	pu32tty_dev_t *d, *n;
+	list_for_each_entry_safe (d, n, &pu32tty_devs, list)
+		pu32tty_remove(d);
+	tty_unregister_driver(pu32tty_driver);
+	put_tty_driver(pu32tty_driver);
+}
+module_exit(pu32tty_destroy_driver);
 
 #ifdef CONFIG_EARLY_PRINTK
 static int __init setup_early_printk (char *buf) {
@@ -237,10 +348,16 @@ static int __init setup_early_printk (char *buf) {
 	if (!buf || early_console)
 		return 0;
 
-	if (pu32_ishw)
-		hwchardev_init();
+	if (pu32_ishw) {
+		hwdrvdevtbl_find (&hwdrvdevtbl_dev, NULL);
+		if (hwdrvdevtbl_dev.mapsz) {
+			pu32tty_dev0.irq = ((hwdrvdevtbl_dev.intridx < 0) ? -1 : hwdrvdevtbl_dev.intridx);
+			pu32tty_dev0.hw.addr = hwdrvdevtbl_dev.addr;
+			hwdrvchar_init (&pu32tty_dev0.hw, 115200);
+		}
+	}
 
-	early_console = &tty_console;
+	early_console = &pu32tty_dev0.console;
 	register_console(early_console);
 
 	return 0;
