@@ -7,6 +7,7 @@
 #include <linux/console.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
+#include <linux/serial.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
@@ -27,6 +28,7 @@ typedef struct {
 	struct timer_list timer;
 	hwdrvchar hw;
 	unsigned long irq;
+	unsigned long baudrate;
 	struct list_head list;
 } pu32tty_dev_t;
 
@@ -125,6 +127,7 @@ static int pu32tty_tty_ops_open (struct tty_struct *tty, struct file *filp) {
 		while (hwdrvchar_read (&dev->hw, &((char){0}), 1));
 	else
 		while (pu32sysread (PU32_BIOS_FD_STDIN, &((char){0}), 1));
+	tty_encode_baud_rate(tty, dev->baudrate, dev->baudrate);
 	if (dev->irq != -1) {
 		ret = request_irq (
 			dev->irq, pu32tty_isr,
@@ -172,6 +175,50 @@ static int pu32tty_chars_in_buffer (struct tty_struct *tty) {
 	return 0; // No buffer.
 }
 
+static void pu32tty_set_termios (struct tty_struct *tty, struct ktermios * old) {
+	pu32tty_dev_t *dev = container_of(tty->port, pu32tty_dev_t, port);
+	unsigned long baudrate = tty_termios_baud_rate(&tty->termios);
+	if (baudrate != dev->baudrate) {
+		dev->baudrate = baudrate;
+		if (pu32_ishw)
+			hwdrvchar_init (&dev->hw, baudrate);
+	}
+}
+
+static int pu32tty_set_serial (struct tty_struct *tty, struct serial_struct *ss) {
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	pu32tty_dev_t *dev = container_of(tty->port, pu32tty_dev_t, port);
+
+	tty_lock(tty);
+	if (dev->baudrate != ss->baud_base) {
+		dev->baudrate = ss->baud_base;
+		if (pu32_ishw)
+			hwdrvchar_init (&dev->hw, dev->baudrate);
+	}
+	tty_unlock(tty);
+
+	return 0;
+}
+
+static int pu32tty_get_serial (struct tty_struct *tty, struct serial_struct *ss) {
+	pu32tty_dev_t *dev = container_of(tty->port, pu32tty_dev_t, port);
+	tty_lock(tty);
+	ss->line = tty->index;
+	ss->port = dev->irq;
+	ss->irq = dev->irq;
+	ss->flags = 0;
+	ss->xmit_fifo_size = dev->hw.bufsz;
+	ss->baud_base = dev->baudrate;
+	ss->close_delay = 0;
+	ss->closing_wait = ASYNC_CLOSING_WAIT_NONE;
+	ss->custom_divisor = 1;
+	tty_unlock(tty);
+	return 0;
+}
+
 static const struct tty_port_operations pu32tty_port_ops = {
 	.activate = 0,
 	.shutdown = 0
@@ -184,6 +231,9 @@ static const struct tty_operations pu32tty_tty_ops = {
 	.write = pu32tty_tty_ops_write,
 	.write_room = pu32tty_tty_ops_write_room,
 	.chars_in_buffer = pu32tty_chars_in_buffer,
+	.set_termios = pu32tty_set_termios,
+	.set_serial = pu32tty_set_serial,
+	.get_serial = pu32tty_get_serial,
 };
 
 static hwdrvdevtbl hwdrvdevtbl_dev = {.e = (devtblentry *)0, .id = 5 /* Character device */};
@@ -259,7 +309,8 @@ static pu32tty_dev_t pu32tty_dev0 = {
 	.hw = {
 		.addr = 0
 	},
-	.irq = -1
+	.irq = -1,
+	.baudrate = 115200
 };
 
 static int __init pu32tty_create_driver (void) {
@@ -306,7 +357,8 @@ static int __init pu32tty_create_driver (void) {
 				dev = kzalloc(sizeof(pu32tty_dev_t), GFP_KERNEL);
 				dev->irq = ((hwdrvdevtbl_dev.intridx < 0) ? -1 : hwdrvdevtbl_dev.intridx);
 				dev->hw.addr = hwdrvdevtbl_dev.addr;
-				hwdrvchar_init (&dev->hw, 115200);
+				dev->baudrate = 115200;
+				hwdrvchar_init (&dev->hw, dev->baudrate);
 			} else
 				break;
 		}
@@ -349,12 +401,16 @@ static int __init setup_early_printk (char *buf) {
 	if (!buf || early_console)
 		return 0;
 
+	char *str = strstr(boot_command_line, "console=ttyS0,");
+	if (str)
+		sscanf(str, "console=ttyS0,%ld", &pu32tty_dev0.baudrate);
+
 	if (pu32_ishw) {
 		hwdrvdevtbl_find (&hwdrvdevtbl_dev, NULL);
 		if (hwdrvdevtbl_dev.mapsz) {
 			pu32tty_dev0.irq = ((hwdrvdevtbl_dev.intridx < 0) ? -1 : hwdrvdevtbl_dev.intridx);
 			pu32tty_dev0.hw.addr = hwdrvdevtbl_dev.addr;
-			hwdrvchar_init (&pu32tty_dev0.hw, 115200);
+			hwdrvchar_init (&pu32tty_dev0.hw, pu32tty_dev0.baudrate);
 		}
 	}
 
