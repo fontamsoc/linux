@@ -19,6 +19,7 @@
 
 #define PU32TTY_CNT_MAX 8
 #define PU32TTY_POLL_DELAY (HZ / 100)
+#define PU32TTY_ISR_DELAY 0
 
 typedef struct {
 	struct console console;
@@ -102,7 +103,7 @@ static irqreturn_t pu32tty_isr (int irq, void *dev_id) {
 		tty_flip_buffer_push(&dev->port);
 	static unsigned long expires = 0;
 	if (dev->irq != -1 && jiffies >= expires) {
-		expires = (jiffies + PU32TTY_POLL_DELAY);
+		expires = (jiffies + PU32TTY_ISR_DELAY);
 		if (pu32_ishw)
 			hwdrvchar_interrupt (&dev->hw, 1);
 	} else { // Preventing too frequent interrupts.
