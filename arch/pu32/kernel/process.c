@@ -525,9 +525,10 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 							struct mm_struct *mm = tsk->active_mm;
 							pgd_t *pgd = mm->pgd + pgd_index(faultaddr);
 							pmd_t *pmd = pmd_offset((pud_t *)pgd, faultaddr); // There is no pmd; this does pmd = pgd.
-							if (!pmd_present(*pmd))
+							pmd_t pmdval = *(volatile pmd_t *)pmd;
+							if (!pmd_present(pmdval))
 								goto out;
-							pte_t pte = *pte_offset_map(pmd, faultaddr);
+							pte_t pte = *(volatile pte_t *)((pte_t *)pmd_page_vaddr(pmdval) + pte_index(faultaddr));
 							if (!pte_present(pte) || !(pte_val(pte) & permtocheck))
 								goto out;
 							tlbentry.d1 = (pte_val(pte) & ~(
