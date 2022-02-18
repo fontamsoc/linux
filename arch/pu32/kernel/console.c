@@ -74,7 +74,13 @@ static void pu32tty_poll (struct timer_list *timer) {
 	unsigned char c;
 	unsigned long n = 0;
 	pu32tty_dev_t *dev = container_of(timer, pu32tty_dev_t, timer);
-	while (pu32sysread (PU32_BIOS_FD_STDIN, &c, 1)) {
+	unsigned long hwchardev_read (void) {
+		if (dev->irq != -1 && pu32_ishw)
+			return hwdrvchar_read (&dev->hw, &c, 1);
+		else
+			return pu32sysread (PU32_BIOS_FD_STDIN, &c, 1);
+	}
+	while (hwchardev_read()) {
 		tty_insert_flip_char (&dev->port, c, TTY_NORMAL);
 		++n;
 	}
