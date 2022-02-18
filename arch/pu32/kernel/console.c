@@ -21,6 +21,7 @@
 #define PU32TTY_CNT_MAX 8
 #define PU32TTY_POLL_DELAY (HZ / 100)
 #define PU32TTY_ISR_DELAY 0
+#define PU32TTY_HWBUFSZ 512 /* used with variable allocated on the stack */
 
 typedef struct {
 	struct console console;
@@ -71,20 +72,20 @@ static struct tty_driver * pu32tty_device (
 }
 
 static void pu32tty_poll (struct timer_list *timer) {
-	unsigned char c;
-	unsigned long n = 0;
+	unsigned char c[PU32TTY_HWBUFSZ];
 	pu32tty_dev_t *dev = container_of(timer, pu32tty_dev_t, timer);
 	unsigned long hwchardev_read (void) {
 		if (dev->irq != -1 && pu32_ishw)
-			return hwdrvchar_read (&dev->hw, &c, 1);
+			return hwdrvchar_read (&dev->hw, &c, PU32TTY_HWBUFSZ);
 		else
 			return pu32sysread (PU32_BIOS_FD_STDIN, &c, 1);
 	}
-	while (hwchardev_read()) {
-		tty_insert_flip_char (&dev->port, c, TTY_NORMAL);
-		++n;
+	unsigned long n, nn = 0;
+	while ((n = hwchardev_read())) {
+		tty_insert_flip_string (&dev->port, (unsigned char *)&c, n);
+		nn |= n;
 	}
-	if (n)
+	if (nn)
 		tty_flip_buffer_push(&dev->port);
 	if (dev->irq != -1) {
 		if (pu32_ishw)
@@ -94,20 +95,20 @@ static void pu32tty_poll (struct timer_list *timer) {
 }
 
 static irqreturn_t pu32tty_isr (int irq, void *dev_id) {
-	unsigned char c;
-	unsigned long n = 0;
+	unsigned char c[PU32TTY_HWBUFSZ];
 	pu32tty_dev_t *dev = (pu32tty_dev_t *)dev_id;
 	unsigned long hwchardev_read (void) {
 		if (dev->irq != -1 && pu32_ishw)
-			return hwdrvchar_read (&dev->hw, &c, 1);
+			return hwdrvchar_read (&dev->hw, &c, PU32TTY_HWBUFSZ);
 		else
 			return pu32sysread (PU32_BIOS_FD_STDIN, &c, 1);
 	}
-	while (hwchardev_read()) {
-		tty_insert_flip_char (&dev->port, c, TTY_NORMAL);
-		++n;
+	unsigned long n, nn = 0;
+	while ((n = hwchardev_read())) {
+		tty_insert_flip_string (&dev->port, (unsigned char *)&c, n);
+		nn |= n;
 	}
-	if (n)
+	if (nn)
 		tty_flip_buffer_push(&dev->port);
 	static unsigned long expires = 0;
 	if (dev->irq != -1 && jiffies >= expires) {
