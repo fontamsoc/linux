@@ -317,10 +317,11 @@ static int __init pu32tty_create_driver (void) {
 
 	int ret;
 
-	pu32tty_driver = alloc_tty_driver(PU32TTY_CNT_MAX);
+	pu32tty_driver = tty_alloc_driver(PU32TTY_CNT_MAX,
+		TTY_DRIVER_RESET_TERMIOS | TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV);
 
-	if (!pu32tty_driver) {
-		ret = -ENOMEM;
+	if (IS_ERR(pu32tty_driver)) {
+		ret = PTR_ERR(pu32tty_driver);
 		goto err;
 	}
 
@@ -332,7 +333,6 @@ static int __init pu32tty_create_driver (void) {
 	pu32tty_driver->subtype = SERIAL_TYPE_NORMAL;
 	pu32tty_driver->init_termios = tty_std_termios;
 	pu32tty_driver->init_termios.c_cflag |= CLOCAL;
-	pu32tty_driver->flags = (TTY_DRIVER_RESET_TERMIOS | TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV);
 	tty_set_operations (pu32tty_driver, &pu32tty_tty_ops);
 
 	ret = tty_register_driver(pu32tty_driver);
