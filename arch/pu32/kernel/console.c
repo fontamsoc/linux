@@ -51,7 +51,7 @@ static void pu32tty_write (
 	pu32tty_dev_t *dev = container_of(con, pu32tty_dev_t, console);
 	if (dev->irq != -1 && pu32_ishw) {
 		for (i = 0; i < n;)
-			i += hwdrvchar_write_ (&dev->hw, (void *)s+i, n-i);
+			i += hwdrvchar_write (&dev->hw, (void *)s+i, n-i);
 	} else {
 		for (i = 0; i < n;)
 			i += pu32syswrite (PU32_BIOS_FD_STDOUT, (void *)s+i, n-i);
