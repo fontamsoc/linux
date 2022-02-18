@@ -12,11 +12,14 @@
 #include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/string.h>
+#include <linux/workqueue.h>
 
 #include <pu32.h>
 #include <hwdrvdevtbl.h>
 #include <hwdrvintctrl.h>
 #include <hwdrvchar.h>
+
+static struct workqueue_struct *pu32tty_wq;
 
 #define PU32TTY_CNT_MAX 8
 #define PU32TTY_POLL_DELAY (HZ / 100)
@@ -27,6 +30,7 @@ typedef struct {
 	struct console console;
 	struct tty_port port;
 	struct timer_list timer;
+	struct work_struct work;
 	hwdrvchar hw;
 	unsigned long irq;
 	unsigned long baudrate;
@@ -94,9 +98,9 @@ static void pu32tty_poll (struct timer_list *timer) {
 		mod_timer (&dev->timer, jiffies + PU32TTY_POLL_DELAY);
 }
 
-static irqreturn_t pu32tty_isr (int irq, void *dev_id) {
+static void pu32tty_work (struct work_struct *work) {
+	pu32tty_dev_t *dev = container_of(work, pu32tty_dev_t, work);
 	unsigned char c[PU32TTY_HWBUFSZ];
-	pu32tty_dev_t *dev = (pu32tty_dev_t *)dev_id;
 	unsigned long hwchardev_read (void) {
 		if (dev->irq != -1 && pu32_ishw)
 			return hwdrvchar_read (&dev->hw, &c, PU32TTY_HWBUFSZ);
@@ -119,6 +123,11 @@ static irqreturn_t pu32tty_isr (int irq, void *dev_id) {
 		expires = (jiffies + PU32TTY_POLL_DELAY);
 		mod_timer (&dev->timer, expires);
 	}
+}
+
+static irqreturn_t pu32tty_isr (int irq, void *dev_id) {
+	pu32tty_dev_t *dev = (pu32tty_dev_t *)dev_id;
+	queue_work(pu32tty_wq, &dev->work);
 	return IRQ_HANDLED;
 }
 
@@ -294,6 +303,8 @@ static int pu32tty_add (pu32tty_dev_t *dev) {
 
 	timer_setup(&dev->timer, pu32tty_poll, 0);
 
+	INIT_WORK(&dev->work, pu32tty_work);
+
 	return 0;
 }
 
@@ -348,6 +359,12 @@ static int __init pu32tty_create_driver (void) {
 		goto err_put_tty_driver;
 	}
 
+	pu32tty_wq = create_workqueue("ttyS");
+	if (!pu32tty_wq) {
+		ret = -ENOMEM;
+		goto err_tty_unregister_driver;
+	}
+
 	pu32tty_dev_t *dev = &pu32tty_dev0;
 
 	if (pu32_ishw) {
@@ -356,7 +373,7 @@ static int __init pu32tty_create_driver (void) {
 
 			ret = pu32tty_add(dev);
 			if (ret)
-				goto err_tty_unregister_driver;
+				goto err_destroy_workqueue;
 			list_add_tail(&dev->list, &pu32tty_devs);
 
 			hwdrvdevtbl_find (&hwdrvdevtbl_dev, NULL);
@@ -374,16 +391,19 @@ static int __init pu32tty_create_driver (void) {
 		dev->irq = PU32_VM_IRQ_TTYS0;
 		ret = pu32tty_add(dev);
 		if (ret)
-			goto err_tty_unregister_driver;
+			goto err_destroy_workqueue;
 		list_add_tail(&dev->list, &pu32tty_devs);
 	}
 
 	return 0;
 
-	err_tty_unregister_driver:;
+	err_destroy_workqueue:;
 	pu32tty_dev_t *n;
 	list_for_each_entry_safe (dev, n, &pu32tty_devs, list)
 		pu32tty_remove(dev);
+	flush_workqueue(pu32tty_wq);
+	destroy_workqueue(pu32tty_wq);
+	err_tty_unregister_driver:
 	tty_unregister_driver(pu32tty_driver);
 	err_put_tty_driver:
 	put_tty_driver(pu32tty_driver);
@@ -397,6 +417,8 @@ static void pu32tty_destroy_driver (void) {
 	pu32tty_dev_t *d, *n;
 	list_for_each_entry_safe (d, n, &pu32tty_devs, list)
 		pu32tty_remove(d);
+	flush_workqueue(pu32tty_wq);
+	destroy_workqueue(pu32tty_wq);
 	tty_unregister_driver(pu32tty_driver);
 	put_tty_driver(pu32tty_driver);
 }
