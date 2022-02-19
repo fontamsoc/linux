@@ -54,7 +54,7 @@ static void pu32tty_write (
 	#endif
 	unsigned long i;
 	pu32tty_dev_t *dev = container_of(con, pu32tty_dev_t, console);
-	if (dev->irq != -1 && pu32_ishw) {
+	if (pu32_ishw) {
 		for (i = 0; i < n;)
 			i += hwdrvchar_write (&dev->hw, (void *)s+i, n-i);
 	} else {
@@ -79,7 +79,7 @@ static void pu32tty_poll (struct timer_list *timer) {
 	unsigned char c[PU32TTY_HWBUFSZ];
 	pu32tty_dev_t *dev = container_of(timer, pu32tty_dev_t, timer);
 	unsigned long hwchardev_read (void) {
-		if (dev->irq != -1 && pu32_ishw)
+		if (pu32_ishw)
 			return hwdrvchar_read (&dev->hw, &c, PU32TTY_HWBUFSZ);
 		else
 			return pu32sysread (PU32_BIOS_FD_STDIN, &c, 1);
@@ -102,7 +102,7 @@ static void pu32tty_work (struct work_struct *work) {
 	pu32tty_dev_t *dev = container_of(work, pu32tty_dev_t, work);
 	unsigned char c[PU32TTY_HWBUFSZ];
 	unsigned long hwchardev_read (void) {
-		if (dev->irq != -1 && pu32_ishw)
+		if (pu32_ishw)
 			return hwdrvchar_read (&dev->hw, &c, PU32TTY_HWBUFSZ);
 		else
 			return pu32sysread (PU32_BIOS_FD_STDIN, &c, 1);
@@ -139,7 +139,7 @@ static int pu32tty_tty_ops_open (struct tty_struct *tty, struct file *filp) {
 		return ret;
 	pu32tty_dev_t *dev = container_of(tty->port, pu32tty_dev_t, port);
 	// Flush stdin.
-	if (dev->irq != -1 && pu32_ishw)
+	if (pu32_ishw)
 		while (hwdrvchar_read (&dev->hw, &((char){0}), 1));
 	else
 		while (pu32sysread (PU32_BIOS_FD_STDIN, &((char){0}), 1));
