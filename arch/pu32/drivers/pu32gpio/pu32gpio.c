@@ -19,30 +19,29 @@
 #include <hwdrvgpio.h>
 #include <hwdrvintctrl.h>
 
-#define MAX_DEV_CNT 4 /* Maximum number of GPIO devices to detect */
 #define MAX_PERDEV_IOCNT ((sizeof(unsigned long)*8) /* Exact count is (ARCHBITSZ-1), but we need a char device that represent all the IOs of the device */)
 
 #define DBNCR_HZ (10 /* Debounce for 100ms */)
 
 typedef struct {
+	atomic_long_t in_use;
+	unsigned long oval;
 	dev_t dev;
 	struct class *class;
 	struct cdev cdev;
-	unsigned long iocnt;
-	unsigned long ival; // Bitfield: 1bit per IO.
-	unsigned long oval; // Bitfield: 1bit per IO.
-	unsigned long use_bin; // Bitfield: 1bit per chardev.
-	unsigned long use_wq; // Bitfield: 1bit per chardev.
-	unsigned long polled; // Bitfield: 1bit per chardev.
 	wait_queue_head_t wq;
 	unsigned long irq;
 	hwdrvgpio hwdev;
+	struct list_head list;
 } pu32gpio_devdata_t;
 
-static pu32gpio_devdata_t pu32gpio_devdata[MAX_DEV_CNT];
+static LIST_HEAD(pu32gpio_devs);
 
 static long pu32gpio_param_use_bin = 0;
 static long pu32gpio_param_use_wq = 0;
+static long pu32gpio_param_mask = -1;
+static long pu32gpio_param_iodir = 0;
+static long pu32gpio_param_dbncr_hz = DBNCR_HZ;
 
 static int pu32gpio_param_use_bin_ops_set (const char *val, const struct kernel_param *kp) {
 	unsigned long v;
@@ -55,7 +54,8 @@ static int pu32gpio_param_use_bin_ops_set (const char *val, const struct kernel_
 	return 0;
 }
 static const struct kernel_param_ops pu32gpio_param_use_bin_ops = {
-	.set = pu32gpio_param_use_bin_ops_set
+	.set = pu32gpio_param_use_bin_ops_set,
+	.get = param_get_long
 };
 
 static int pu32gpio_param_use_wq_ops_set (const char *val, const struct kernel_param *kp) {
@@ -69,7 +69,47 @@ static int pu32gpio_param_use_wq_ops_set (const char *val, const struct kernel_p
 	return 0;
 }
 static const struct kernel_param_ops pu32gpio_param_use_wq_ops = {
-	.set = pu32gpio_param_use_wq_ops_set
+	.set = pu32gpio_param_use_wq_ops_set,
+	.get = param_get_long
+};
+
+static int pu32gpio_param_mask_ops_set (const char *val, const struct kernel_param *kp) {
+	unsigned long v;
+	int ret = kstrtol (val, 0, &v);
+	if (ret)
+		return ret;
+	pu32gpio_param_mask = v;
+	return 0;
+}
+static const struct kernel_param_ops pu32gpio_param_mask_ops = {
+	.set = pu32gpio_param_mask_ops_set,
+	.get = param_get_hexint
+};
+
+static int pu32gpio_param_iodir_ops_set (const char *val, const struct kernel_param *kp) {
+	unsigned long v;
+	int ret = kstrtol (val, 0, &v);
+	if (ret)
+		return ret;
+	pu32gpio_param_iodir = v;
+	return 0;
+}
+static const struct kernel_param_ops pu32gpio_param_iodir_ops = {
+	.set = pu32gpio_param_iodir_ops_set,
+	.get = param_get_hexint
+};
+
+static int pu32gpio_param_dbncr_hz_ops_set (const char *val, const struct kernel_param *kp) {
+	unsigned long v;
+	int ret = kstrtol (val, 0, &v);
+	if (ret)
+		return ret;
+	pu32gpio_param_dbncr_hz = v;
+	return 0;
+}
+static const struct kernel_param_ops pu32gpio_param_dbncr_hz_ops = {
+	.set = pu32gpio_param_dbncr_hz_ops_set,
+	.get = param_get_long
 };
 
 module_param_cb(IOCTL_USE_BIN, &pu32gpio_param_use_bin_ops, &pu32gpio_param_use_bin, 0644);
@@ -77,6 +117,15 @@ MODULE_PARM_DESC(IOCTL_USE_BIN, "use binary instead of text");
 
 module_param_cb(IOCTL_USE_WQ, &pu32gpio_param_use_wq_ops, &pu32gpio_param_use_wq, 0644);
 MODULE_PARM_DESC(IOCTL_USE_WQ, "use interrupt instead of polling");
+
+module_param_cb(IOCTL_MASK, &pu32gpio_param_mask_ops, &pu32gpio_param_mask, 0644);
+MODULE_PARM_DESC(IOCTL_MASK, "mask of bits to use");
+
+module_param_cb(IOCTL_IODIR, &pu32gpio_param_iodir_ops, &pu32gpio_param_iodir, 0644);
+MODULE_PARM_DESC(IOCTL_IODIR, "IO direction bits: 0(in) 1(out)");
+
+module_param_cb(IOCTL_DBNCR_HZ, &pu32gpio_param_dbncr_hz_ops, &pu32gpio_param_dbncr_hz, 0644);
+MODULE_PARM_DESC(IOCTL_DBNCR_HZ, "debouncer hz");
 
 static long pu32gpio_param_donotuse = 0;
 static int __init pu32gpio_param_donotuse_fn (char *buf) {
@@ -120,21 +169,26 @@ static int pu32gpio_uevent (struct device *dev, struct kobj_uevent_env *env) {
 static struct class *devclass;
 
 static void pu32gpio_exit (void) {
-	unsigned i, j;
-	for (i = 0; i < MAX_DEV_CNT; ++i) {
-		if (!MAJOR(pu32gpio_devdata[i].dev))
+
+	pu32gpio_devdata_t *devdata, *n;
+
+	list_for_each_entry_safe (devdata, n, &pu32gpio_devs, list) {
+		if (!MAJOR(devdata->dev))
 			break;
-		unsigned long irq = pu32gpio_devdata[i].irq;
+		unsigned long irq = devdata->irq;
 		if (irq != -1) {
 			hwdrvintctrl_ena (irq, 0);
-			free_irq (irq, &pu32gpio_devdata[i]);
+			free_irq (irq, devdata);
 		}
-		unsigned cdevcnt = (pu32gpio_devdata[i].iocnt + 1);
+		unsigned j;
+		unsigned cdevcnt = (devdata->hwdev.iocnt + 1);
 		for (j = 0; j < cdevcnt; ++j)
-			device_destroy (devclass, MKDEV(MAJOR(pu32gpio_devdata[i].dev), j));
-		cdev_del (&pu32gpio_devdata[i].cdev);
-		unregister_chrdev_region (pu32gpio_devdata[i].dev, MAX_PERDEV_IOCNT);
+			device_destroy (devclass, MKDEV(MAJOR(devdata->dev), j));
+		cdev_del (&devdata->cdev);
+		unregister_chrdev_region (devdata->dev, MAX_PERDEV_IOCNT);
+		kfree(devdata);
 	}
+
 	class_destroy (devclass);
 }
 
@@ -142,7 +196,8 @@ extern unsigned long pu32_ishw;
 
 #include <hwdrvdevtbl.h>
 static hwdrvdevtbl hwdrvdevtbl_dev = {
-	.e = (devtblentry *)0, .id = 6 /* GPIO device */ };
+	.e = (devtblentry *)0,
+	.id = 6 /* GPIO device */ };
 
 static int __init pu32gpio_init (void) {
 	if (pu32gpio_param_donotuse || !pu32_ishw)
@@ -150,44 +205,42 @@ static int __init pu32gpio_init (void) {
 	devclass = class_create (THIS_MODULE, "pu32gpio");
 	devclass->dev_uevent = pu32gpio_uevent;
 	unsigned i, j;
-	for (i = 0; i < MAX_DEV_CNT; ++i) {
+	for (i = 0;; ++i) {
 		hwdrvdevtbl_find (&hwdrvdevtbl_dev, NULL);
 		if (!hwdrvdevtbl_dev.mapsz)
 			break;
-		char str[16];
-		snprintf (str, sizeof(str), "gpio%c", 'a'+i);
-		if (alloc_chrdev_region(&pu32gpio_devdata[i].dev, 0, MAX_PERDEV_IOCNT, str) < 0)
+		pu32gpio_devdata_t *devdata = kzalloc(sizeof(pu32gpio_devdata_t), GFP_KERNEL);
+		list_add_tail(&devdata->list, &pu32gpio_devs);
+		char str[8];
+		snprintf (str, sizeof(str), "gpio%c", 'A'+i);
+		if (alloc_chrdev_region(&devdata->dev, 0, MAX_PERDEV_IOCNT, str) < 0)
 			goto err;
-		pu32gpio_devdata[i].hwdev.addr = hwdrvdevtbl_dev.addr;
-		hwdrvgpio_configureio (&pu32gpio_devdata[i].hwdev, 0);
-		hwdrvgpio_setdebounce (&pu32gpio_devdata[i].hwdev, -1);
-		hwdrvgpio_setdebounce (&pu32gpio_devdata[i].hwdev,
-			(pu32gpio_devdata[i].hwdev.clkfreq / DBNCR_HZ));
-		pu32gpio_devdata[i].iocnt = pu32gpio_devdata[i].hwdev.iocnt;
-		cdev_init (&pu32gpio_devdata[i].cdev, &pu32gpio_fops);
-		pu32gpio_devdata[i].cdev.owner = THIS_MODULE;
-		unsigned cdevcnt = (pu32gpio_devdata[i].iocnt + 1);
-		cdev_add (&pu32gpio_devdata[i].cdev, pu32gpio_devdata[i].dev, cdevcnt);
+		devdata->hwdev.addr = hwdrvdevtbl_dev.addr;
+		hwdrvgpio_configureio (&devdata->hwdev, 0); // Used to retrieve IO count.
+		hwdrvgpio_setdebounce (&devdata->hwdev, -1); // Used to retrieve clock frequency.
+		cdev_init (&devdata->cdev, &pu32gpio_fops);
+		devdata->cdev.owner = THIS_MODULE;
+		unsigned cdevcnt = (devdata->hwdev.iocnt + 1);
+		cdev_add (&devdata->cdev, devdata->dev, cdevcnt);
 		for (j = 0; j < cdevcnt; ++j)
 			device_create (
 				devclass,
 				NULL,
-				MKDEV(MAJOR(pu32gpio_devdata[i].dev), j),
+				MKDEV(MAJOR(devdata->dev), j),
 				NULL,
 				(j>0) ? "%s%u" : "%s", str, (j-1));
-		init_waitqueue_head (&pu32gpio_devdata[i].wq);
+		init_waitqueue_head (&devdata->wq);
 		if (hwdrvdevtbl_dev.intridx >= 0) {
 			int ret = request_irq (
 				hwdrvdevtbl_dev.intridx, pu32gpio_isr,
-				IRQF_SHARED, "pu32gpio", &pu32gpio_devdata[i]);
+				IRQF_SHARED, "pu32gpio", devdata);
 			if (ret) {
 				pr_err("request_irq(%lu) == %d\n", hwdrvdevtbl_dev.intridx, ret);
-				pu32gpio_devdata[i].irq = -1;
+				devdata->irq = -1;
 			} else
-				pu32gpio_devdata[i].irq = hwdrvdevtbl_dev.intridx;
+				devdata->irq = hwdrvdevtbl_dev.intridx;
 		} else
-			pu32gpio_devdata[i].irq = -1;
-		++hwdrvdevtbl_dev.e;
+			devdata->irq = -1;
 	}
 	if (!i)
 		goto err;
@@ -197,44 +250,105 @@ static int __init pu32gpio_init (void) {
 	return -EIO;
 }
 
+typedef struct {
+	unsigned long ival;
+	bool use_bin;
+	bool use_wq;
+	unsigned long mask;
+} pu32gpio_filedata_t;
+
 static int pu32gpio_open (struct inode *inode, struct file *file) {
+
+	pu32gpio_filedata_t *filedata = kzalloc(sizeof(pu32gpio_filedata_t), GFP_KERNEL);
+
+	file->private_data = filedata;
+
 	pu32gpio_devdata_t *devdata = container_of(inode->i_cdev, pu32gpio_devdata_t, cdev);
+
+	filedata->use_bin = pu32gpio_param_use_bin;
+	if (file->f_flags & O_NONBLOCK)
+		filedata->use_wq = 0;
+	else
+		filedata->use_wq = (devdata->irq != -1 && pu32gpio_param_use_wq);
 	unsigned long minor = MINOR(file->f_path.dentry->d_inode->i_rdev);
-	devdata->use_bin |= (pu32gpio_param_use_bin<<minor);
-	if (devdata->use_wq |= ((devdata->irq != -1 && pu32gpio_param_use_wq)<<minor)) {
+	unsigned long idx = (minor - 1);
+
+	unsigned long mask;
+	if (minor)
+		mask = (1<<idx);
+	else
+		mask = pu32gpio_param_mask;
+	filedata->mask = mask;
+
+	unsigned long iodir = ((pu32gpio_param_iodir & mask) | (pu32gpio_param_iodir & ~mask));
+	hwdrvgpio_configureio (&devdata->hwdev, iodir);
+
+	hwdrvgpio_setdebounce (&devdata->hwdev, (devdata->hwdev.clkfreq / pu32gpio_param_dbncr_hz));
+
+	if (filedata->use_wq) {
 		unsigned long irq = devdata->irq;
 		if (irq != -1)
 			hwdrvintctrl_ena (irq, 1);
 	}
-	pu32gpio_param_use_bin = 0;
-	pu32gpio_param_use_wq = 0;
+
+	atomic_long_inc(&devdata->in_use);
+
 	return 0;
 }
 
 static int pu32gpio_release (struct inode *inode, struct file *file) {
+
+	pu32gpio_filedata_t *filedata = file->private_data;
+
 	pu32gpio_devdata_t *devdata = container_of(inode->i_cdev, pu32gpio_devdata_t, cdev);
-	unsigned long minor = MINOR(file->f_path.dentry->d_inode->i_rdev);
-	devdata->use_bin &= ~(1<<minor);
-	if (!(devdata->use_wq &= ~(1<<minor))) {
+
+	if (filedata->use_wq && (atomic_long_dec_if_positive(&devdata->in_use) < 1)) {
 		unsigned long irq = devdata->irq;
 		if (irq != -1)
 			hwdrvintctrl_ena (irq, 0);
 	}
-	devdata->polled &= ~(1<<minor);
+
+	kfree(filedata);
+
 	return 0;
 }
 
 static long pu32gpio_ioctl (struct file *file, unsigned int cmd, unsigned long arg) {
-	int ret;
-	pu32gpio_devdata_t *devdata = container_of(file_inode(file)->i_cdev, pu32gpio_devdata_t, cdev);
+
+	pu32gpio_filedata_t *filedata = file->private_data;
+
 	unsigned long minor = MINOR(file->f_path.dentry->d_inode->i_rdev);
+	//unsigned long idx = (minor - 1);
+
+	int ret;
 	switch (cmd) {
 		case GPIO_IOCTL_USE_BIN:
-			devdata->use_bin |= ((!!arg)<<minor);
+			filedata->use_bin = (!!arg);
 			ret = 0;
 			break;
 		case GPIO_IOCTL_USE_WQ:
-			devdata->use_wq |= ((!!arg)<<minor);
+			filedata->use_wq = (!!arg);
+			ret = 0;
+			break;
+		case GPIO_IOCTL_MASK:
+			if (minor)
+				return -EPERM;
+			filedata->mask = arg;
+			ret = 0;
+			break;
+		case GPIO_IOCTL_IODIR:
+			if (minor) {
+				if (arg > 1)
+					return -EINVAL;
+				arg <<= (minor-1);
+			}
+			pu32gpio_devdata_t *devdata = container_of(file_inode(file)->i_cdev, pu32gpio_devdata_t, cdev);
+			unsigned long mask = filedata->mask;
+			hwdrvgpio_configureio (&devdata->hwdev, ((arg & mask) | (arg & ~mask)));
+			ret = 0;
+			break;
+		case GPIO_IOCTL_DBNCR_HZ:
+			hwdrvgpio_setdebounce (&devdata->hwdev, (devdata->hwdev.clkfreq / arg));
 			ret = 0;
 			break;
 		default:
@@ -247,20 +361,34 @@ static long pu32gpio_ioctl (struct file *file, unsigned int cmd, unsigned long a
 #define GPIODATASZ (2/*0x*/+((sizeof(unsigned long)*8)/4)/*hex-digits*/+1/*null*/)
 
 static ssize_t pu32gpio_read (struct file *file, char __user *buf, size_t count, loff_t *offset) {
+
+	pu32gpio_filedata_t *filedata = file->private_data;
+
 	pu32gpio_devdata_t *devdata = container_of(file_inode(file)->i_cdev, pu32gpio_devdata_t, cdev);
+
+	unsigned long val = filedata->ival;
+
 	unsigned long minor = MINOR(file->f_path.dentry->d_inode->i_rdev);
-	unsigned long idx, use_bin;
-	if (minor) {
-		idx = (minor-1);
-		use_bin = ((devdata->use_bin>>minor)&1);
-	}
-	char data[GPIODATASZ];
-	if (!*offset && !((devdata->polled>>minor)&1))
-		devdata->ival = *(volatile unsigned long *)devdata->hwdev.addr;
-	devdata->polled &= ~(1<<minor);
-	used_wq:;
-	unsigned long val = devdata->ival;
+	unsigned long idx = (minor - 1);
+
+	if (filedata->use_wq) {
+		int ret = wait_event_interruptible (
+			devdata->wq,
+			(((filedata->ival = *(volatile unsigned long *)devdata->hwdev.addr) ^ val) & filedata->mask));
+		if (ret)
+			return ret;
+		*offset = 0;
+	} else
+		filedata->ival = *(volatile unsigned long *)devdata->hwdev.addr;
+
+	val = (filedata->ival & filedata->mask);
+
 	unsigned long datalen;
+
+	char data[GPIODATASZ];
+
+	unsigned long use_bin = filedata->use_bin;
+
 	if (minor) {
 		data[0] = ((use_bin?0:'0') + ((val>>idx)&1));
 		if (use_bin)
@@ -269,39 +397,38 @@ static ssize_t pu32gpio_read (struct file *file, char __user *buf, size_t count,
 			data[1] = 0;
 			datalen = 2;
 		}
-	} else if (devdata->use_bin&1) {
+	} else if (use_bin) {
 		*(unsigned long *)data = val;
 		datalen = sizeof(unsigned long);
 	} else {
 		datalen = snprintf (data, sizeof(data), "0x%lx", val);
 		data[datalen] = 0;
 	}
-	if (*offset >= datalen) {
-		if ((devdata->use_wq>>minor)&1) {
-			int ret = wait_event_interruptible (devdata->wq, (
-				minor ?
-					((((devdata->ival = *(volatile unsigned long *)devdata->hwdev.addr)>>idx)&1) != ((val>>idx)&1)) :
-					((devdata->ival = *(volatile unsigned long *)devdata->hwdev.addr) != val)));
-			if (ret)
-				return ret;
-			*offset = 0;
-			goto used_wq;
-		}
-		return 0;
-	}
-	datalen -= *offset;
+
+	if (*offset <= datalen)
+		datalen -= *offset;
+	else
+		datalen = 0;
+
 	if (count > datalen)
 		count = datalen;
 	if (copy_to_user(buf, &data[*offset], count))
 		return -EFAULT;
+
 	*offset += count;
+
 	return count;
 }
 
 static ssize_t pu32gpio_write (struct file *file, const char __user *buf, size_t count, loff_t *offset) {
-	pu32gpio_devdata_t *devdata = container_of(file_inode(file)->i_cdev, pu32gpio_devdata_t, cdev);
+
+	pu32gpio_filedata_t *filedata = file->private_data;
+
+	unsigned long use_bin = filedata->use_bin;
+
 	unsigned long minor = MINOR(file->f_path.dentry->d_inode->i_rdev);
-	unsigned long use_bin = ((devdata->use_bin>>minor)&1);
+	unsigned long idx = (minor - 1);
+
 	unsigned long datalen;
 	if (minor)
 		datalen = (use_bin?1:2);
@@ -309,11 +436,14 @@ static ssize_t pu32gpio_write (struct file *file, const char __user *buf, size_t
 		datalen = sizeof(unsigned long);
 	else
 		datalen = GPIODATASZ;
+
 	if (count > datalen)
 		count = datalen;
+
 	char data[GPIODATASZ];
 	if (copy_from_user(data, buf, count))
 		return -EFAULT;
+
 	unsigned long val;
 	if (use_bin)
 		val = *(unsigned long *)data;
@@ -322,23 +452,30 @@ static ssize_t pu32gpio_write (struct file *file, const char __user *buf, size_t
 		if ((kstrtol (data, 0, &val)) || (minor && (val > 1)))
 			return -EINVAL;
 	}
+
+	pu32gpio_devdata_t *devdata = container_of(file_inode(file)->i_cdev, pu32gpio_devdata_t, cdev);
+
+	unsigned long oldval = devdata->oval;
+
 	if (minor) {
-		unsigned long idx = (minor-1);
-		unsigned long mask = (1<<idx);
-		unsigned long newval = ((!!val)<<idx);
-		unsigned long oldval = devdata->oval;
-		val = (newval | (oldval & ~mask));
+		val = ((val&1)<<idx);
+		val = (val | (oldval & ~(1<<idx)));
+	} else {
+		unsigned long mask = filedata->mask;
+		val = ((val & mask) | (oldval & ~mask));
 	}
+
 	devdata->oval = val;
+
 	*(volatile unsigned long *)devdata->hwdev.addr = val;
-	*offset = 0;
+
 	return count;
 }
 
 static loff_t pu32gpio_llseek (struct file *file, loff_t offset, int whence) {
-	pu32gpio_devdata_t *devdata = container_of(file_inode(file)->i_cdev, pu32gpio_devdata_t, cdev);
+	pu32gpio_filedata_t *filedata = file->private_data;
+	unsigned long use_bin = filedata->use_bin;
 	unsigned long minor = MINOR(file->f_path.dentry->d_inode->i_rdev);
-	unsigned long use_bin = ((devdata->use_bin>>minor)&1);
 	unsigned long datalen;
 	if (minor)
 		datalen = (use_bin?1:2);
@@ -365,18 +502,17 @@ static loff_t pu32gpio_llseek (struct file *file, loff_t offset, int whence) {
 }
 
 static __poll_t pu32gpio_poll (struct file *file, struct poll_table_struct *wait) {
+
+	pu32gpio_filedata_t *filedata = file->private_data;
+
 	pu32gpio_devdata_t *devdata = container_of(file_inode(file)->i_cdev, pu32gpio_devdata_t, cdev);
-	unsigned long minor = MINOR(file->f_path.dentry->d_inode->i_rdev);
-	if ((devdata->use_wq>>minor)&1)
+
+	if (filedata->use_wq)
 		poll_wait (file, &devdata->wq, wait);
-	unsigned long val = devdata->ival;
-	unsigned long idx;
-	if (minor ? (idx = (minor-1)),
-		((((*(volatile unsigned long *)devdata->hwdev.addr)>>idx)&1) != ((val>>idx)&1)) :
-		(*(volatile unsigned long *)devdata->hwdev.addr != val)) {
-		devdata->ival = val;
+
+	unsigned long val = filedata->ival;
+	if (((filedata->ival = *(volatile unsigned long *)devdata->hwdev.addr) ^ val) & filedata->mask) {
 		file->f_pos = 0;
-		devdata->polled |= (1<<minor);
 		return (EPOLLIN | EPOLLRDNORM);
 	}
 	return 0;

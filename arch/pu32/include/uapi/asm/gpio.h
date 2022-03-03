@@ -9,7 +9,10 @@
 
 #define GPIO_IOCTL_BASE 'g'
 
-#define GPIO_IOCTL_USE_BIN _IOW(GPIO_IOCTL_BASE, 0x1, unsigned long)
-#define GPIO_IOCTL_USE_WQ  _IOW(GPIO_IOCTL_BASE, 0x2, unsigned long)
+#define GPIO_IOCTL_USE_BIN  _IOW(GPIO_IOCTL_BASE, 0x1, unsigned long)
+#define GPIO_IOCTL_USE_WQ   _IOW(GPIO_IOCTL_BASE, 0x2, unsigned long)
+#define GPIO_IOCTL_MASK     _IOW(GPIO_IOCTL_BASE, 0x3, unsigned long)
+#define GPIO_IOCTL_IODIR    _IOW(GPIO_IOCTL_BASE, 0x4, unsigned long)
+#define GPIO_IOCTL_DBNCR_HZ _IOW(GPIO_IOCTL_BASE, 0x5, unsigned long)
 
 #endif /* __UAPI_ASM_PU32_GPIO_H */
