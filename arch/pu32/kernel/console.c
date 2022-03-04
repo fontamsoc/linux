@@ -194,7 +194,7 @@ static int pu32tty_chars_in_buffer (struct tty_struct *tty) {
 static void pu32tty_set_termios (struct tty_struct *tty, struct ktermios * old) {
 	pu32tty_dev_t *dev = container_of(tty->port, pu32tty_dev_t, port);
 	unsigned long baudrate = tty_termios_baud_rate(&tty->termios);
-	if (baudrate != dev->baudrate) {
+	if (baudrate && baudrate != dev->baudrate) {
 		dev->baudrate = baudrate;
 		if (pu32_ishw)
 			hwdrvchar_init (&dev->hw, baudrate);
@@ -208,9 +208,11 @@ static int pu32tty_set_serial (struct tty_struct *tty, struct serial_struct *ss)
 
 	pu32tty_dev_t *dev = container_of(tty->port, pu32tty_dev_t, port);
 
+	unsigned long baudrate = ss->baud_base;
+
 	tty_lock(tty);
-	if (dev->baudrate != ss->baud_base) {
-		dev->baudrate = ss->baud_base;
+	if (baudrate && baudrate != dev->baudrate) {
+		dev->baudrate = baudrate;
 		if (pu32_ishw)
 			hwdrvchar_init (&dev->hw, dev->baudrate);
 	}
