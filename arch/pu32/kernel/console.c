@@ -161,7 +161,7 @@ static int pu32tty_tty_ops_open (struct tty_struct *tty, struct file *filp) {
 }
 
 static void pu32tty_tty_ops_close (struct tty_struct *tty, struct file *filp) {
-	if (tty->count != 1)
+	if (tty->count > 1)
 		return;
 	pu32tty_dev_t *dev = container_of(tty->port, pu32tty_dev_t, port);
 	if (dev->irq != -1) {
