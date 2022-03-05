@@ -5,7 +5,7 @@
 
 #include <pu32.h>
 
-void pu32stdout (const char *fmt, ...) {
+void pu32printf (const char *fmt, ...) {
 
 	va_list args;
 

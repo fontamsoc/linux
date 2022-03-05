@@ -182,7 +182,7 @@ unsigned long pu32_kernelmode_stack[NR_CPUS];
 // that will execute in pu32-kernelmode after
 // the first use of sysret; it is also where
 // transition between userspace and kernelspace occurs.
-// Within this function, pu32stdout() must be
+// Within this function, pu32printf() must be
 // used instead of printk() or pr_*() functions.
 // All pu32core must run this function,
 // as it does work common to all cores.
@@ -402,7 +402,7 @@ __attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
 								if (next_ti_in_userspace) {
 									#if defined(CONFIG_PU32_DEBUG)
 									if (pu32irqflags[raw_smp_processor_id()] == ARCH_IRQ_DISABLED)
-										pu32stdout("returning to userspace with interrupts disabled !!!\n");
+										pu32printf("returning to userspace with interrupts disabled !!!\n");
 									#endif
 								}
 

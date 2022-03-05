@@ -778,7 +778,7 @@ static inline ssize_t pu32syswrite (int fd, void *buf, size_t count) {
 	return ((a1 != -1) ? a1 : 0);
 }
 
-void pu32stdout (const char *fmt, ...);
+void pu32printf (const char *fmt, ...);
 
 static inline off_t pu32syslseek (int fd, off_t offset, int whence) {
 

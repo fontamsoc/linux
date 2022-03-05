@@ -312,7 +312,7 @@ __attribute__((noreturn)) void __init pu32_start (char **argv, char **envp) {
 		hwdrvdevtbl hwdrvdevtbl_dev = {.e = (devtblentry *)0, .id = 1 /* RAM device */};
 		hwdrvdevtbl_find (&hwdrvdevtbl_dev, NULL);
 		if (!hwdrvdevtbl_dev.mapsz) {
-			pu32stdout("memory not found\n");
+			pu32printf("memory not found\n");
 			while(1); }
 		pu32_mem_start = (unsigned long)hwdrvdevtbl_dev.addr;
 		pu32_mem_end_high = pu32_mem_start + (hwdrvdevtbl_dev.mapsz * sizeof(unsigned long));
@@ -325,17 +325,17 @@ __attribute__((noreturn)) void __init pu32_start (char **argv, char **envp) {
 	} else {
 		char *e = getenv("MEMSTARTADDR", envp); // Memory start.
 		if (e && kstrtoul(e, 0, &pu32_mem_start) == 0)
-			/*pu32stdout("MEMSTARTADDR\t:0x%x\n", pu32_mem_start)*/;
+			/*pu32printf("MEMSTARTADDR\t:0x%x\n", pu32_mem_start)*/;
 		else {
-			pu32stdout("memory not found\n");
+			pu32printf("memory not found\n");
 			while(1);
 		}
 
 		e = getenv("MEMENDADDR", envp); // First byte after last memory byte.
 		if (e && kstrtoul(e, 0, &pu32_mem_end_high) == 0)
-			/*pu32stdout("MEMENDADDR\t:0x%x\n", pu32_mem_end_high)*/;
+			/*pu32printf("MEMENDADDR\t:0x%x\n", pu32_mem_end_high)*/;
 		else {
-			pu32stdout("memory not found\n");
+			pu32printf("memory not found\n");
 			while(1);
 		}
 

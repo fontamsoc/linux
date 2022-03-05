@@ -5,7 +5,7 @@
 void pu32hang (const char *fmt, ...) {
 	va_list args;
 	va_start (args, fmt);
-	pu32stdout (fmt, args);
+	pu32printf (fmt, args);
 	void dump_stack_print_info (const char *log_lvl);
 	dump_stack_print_info (KERN_DEFAULT);
 	unsigned long *sp; asm volatile ("setkgpr %0, %%sp" : "=r"(sp));
