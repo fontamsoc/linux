@@ -317,10 +317,12 @@ __attribute__((noreturn)) void __init pu32_start (char **argv, char **envp) {
 		pu32_mem_start = (unsigned long)hwdrvdevtbl_dev.addr;
 		pu32_mem_end_high = pu32_mem_start + (hwdrvdevtbl_dev.mapsz * sizeof(unsigned long));
 
+		#ifdef CONFIG_PROC_FS
 		c_info_rcache = 1 /* RAMCACHESZ */;
 		asm volatile ("ldst %0, %1" : "+r" (c_info_rcache) : "r"  (DEVTBLADDR));
 		c_info_rcache *= sizeof(unsigned long);
 		c_info_rcache /= 1024;
+		#endif
 
 	} else {
 		char *e = getenv("MEMSTARTADDR", envp); // Memory start.
@@ -342,10 +344,14 @@ __attribute__((noreturn)) void __init pu32_start (char **argv, char **envp) {
 		// Update where BIOS ends in memory.
 		pu32_bios_end = pu32_mem_start;
 
+		#ifdef CONFIG_PROC_FS
 		c_info_rcache = 0;
+		#endif
 	}
 
+	#ifdef CONFIG_PROC_FS
 	c_setup();
+	#endif
 
 	// By convention, the first physical page cannot be RAM.
 	pu32_mem_start = ((pu32_mem_start > PAGE_SIZE) ? pu32_mem_start : PAGE_SIZE);
