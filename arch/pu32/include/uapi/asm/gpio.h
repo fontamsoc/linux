@@ -14,5 +14,6 @@
 #define GPIO_IOCTL_MASK     _IOW(GPIO_IOCTL_BASE, 0x3, unsigned long)
 #define GPIO_IOCTL_IODIR    _IOW(GPIO_IOCTL_BASE, 0x4, unsigned long)
 #define GPIO_IOCTL_DBNCR_HZ _IOW(GPIO_IOCTL_BASE, 0x5, unsigned long)
+#define GPIO_IOCTL_IOCNT    _IOW(GPIO_IOCTL_BASE, 0x6, unsigned long)
 
 #endif /* __UAPI_ASM_PU32_GPIO_H */

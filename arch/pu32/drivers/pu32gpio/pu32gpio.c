@@ -42,6 +42,7 @@ static long pu32gpio_param_use_wq = 0;
 static long pu32gpio_param_mask = -1;
 static long pu32gpio_param_iodir = 0;
 static long pu32gpio_param_dbncr_hz = DBNCR_HZ;
+static long pu32gpio_param_iocnt = 0;
 
 static int pu32gpio_param_use_bin_ops_set (const char *val, const struct kernel_param *kp) {
 	unsigned long v;
@@ -54,8 +55,7 @@ static int pu32gpio_param_use_bin_ops_set (const char *val, const struct kernel_
 	return 0;
 }
 static const struct kernel_param_ops pu32gpio_param_use_bin_ops = {
-	.set = pu32gpio_param_use_bin_ops_set,
-	.get = param_get_long
+	.set = pu32gpio_param_use_bin_ops_set
 };
 
 static int pu32gpio_param_use_wq_ops_set (const char *val, const struct kernel_param *kp) {
@@ -69,8 +69,7 @@ static int pu32gpio_param_use_wq_ops_set (const char *val, const struct kernel_p
 	return 0;
 }
 static const struct kernel_param_ops pu32gpio_param_use_wq_ops = {
-	.set = pu32gpio_param_use_wq_ops_set,
-	.get = param_get_long
+	.set = pu32gpio_param_use_wq_ops_set
 };
 
 static int pu32gpio_param_mask_ops_set (const char *val, const struct kernel_param *kp) {
@@ -82,8 +81,7 @@ static int pu32gpio_param_mask_ops_set (const char *val, const struct kernel_par
 	return 0;
 }
 static const struct kernel_param_ops pu32gpio_param_mask_ops = {
-	.set = pu32gpio_param_mask_ops_set,
-	.get = param_get_hexint
+	.set = pu32gpio_param_mask_ops_set
 };
 
 static int pu32gpio_param_iodir_ops_set (const char *val, const struct kernel_param *kp) {
@@ -95,8 +93,7 @@ static int pu32gpio_param_iodir_ops_set (const char *val, const struct kernel_pa
 	return 0;
 }
 static const struct kernel_param_ops pu32gpio_param_iodir_ops = {
-	.set = pu32gpio_param_iodir_ops_set,
-	.get = param_get_hexint
+	.set = pu32gpio_param_iodir_ops_set
 };
 
 static int pu32gpio_param_dbncr_hz_ops_set (const char *val, const struct kernel_param *kp) {
@@ -108,23 +105,22 @@ static int pu32gpio_param_dbncr_hz_ops_set (const char *val, const struct kernel
 	return 0;
 }
 static const struct kernel_param_ops pu32gpio_param_dbncr_hz_ops = {
-	.set = pu32gpio_param_dbncr_hz_ops_set,
-	.get = param_get_long
+	.set = pu32gpio_param_dbncr_hz_ops_set
 };
 
-module_param_cb(IOCTL_USE_BIN, &pu32gpio_param_use_bin_ops, &pu32gpio_param_use_bin, 0644);
+module_param_cb(IOCTL_USE_BIN, &pu32gpio_param_use_bin_ops, &pu32gpio_param_use_bin, 0220);
 MODULE_PARM_DESC(IOCTL_USE_BIN, "use binary instead of text");
 
-module_param_cb(IOCTL_USE_WQ, &pu32gpio_param_use_wq_ops, &pu32gpio_param_use_wq, 0644);
+module_param_cb(IOCTL_USE_WQ, &pu32gpio_param_use_wq_ops, &pu32gpio_param_use_wq, 0220);
 MODULE_PARM_DESC(IOCTL_USE_WQ, "use interrupt instead of polling");
 
-module_param_cb(IOCTL_MASK, &pu32gpio_param_mask_ops, &pu32gpio_param_mask, 0644);
+module_param_cb(IOCTL_MASK, &pu32gpio_param_mask_ops, &pu32gpio_param_mask, 0220);
 MODULE_PARM_DESC(IOCTL_MASK, "mask of bits to use");
 
-module_param_cb(IOCTL_IODIR, &pu32gpio_param_iodir_ops, &pu32gpio_param_iodir, 0644);
+module_param_cb(IOCTL_IODIR, &pu32gpio_param_iodir_ops, &pu32gpio_param_iodir, 0220);
 MODULE_PARM_DESC(IOCTL_IODIR, "IO direction bits: 0(in) 1(out)");
 
-module_param_cb(IOCTL_DBNCR_HZ, &pu32gpio_param_dbncr_hz_ops, &pu32gpio_param_dbncr_hz, 0644);
+module_param_cb(IOCTL_DBNCR_HZ, &pu32gpio_param_dbncr_hz_ops, &pu32gpio_param_dbncr_hz, 0220);
 MODULE_PARM_DESC(IOCTL_DBNCR_HZ, "debouncer hz");
 
 static long pu32gpio_param_donotuse = 0;
@@ -315,6 +311,8 @@ static int pu32gpio_release (struct inode *inode, struct file *file) {
 
 static long pu32gpio_ioctl (struct file *file, unsigned int cmd, unsigned long arg) {
 
+	pu32gpio_devdata_t *devdata;
+
 	pu32gpio_filedata_t *filedata = file->private_data;
 
 	unsigned long minor = MINOR(file->f_path.dentry->d_inode->i_rdev);
@@ -342,14 +340,19 @@ static long pu32gpio_ioctl (struct file *file, unsigned int cmd, unsigned long a
 					return -EINVAL;
 				arg <<= (minor-1);
 			}
-			pu32gpio_devdata_t *devdata = container_of(file_inode(file)->i_cdev, pu32gpio_devdata_t, cdev);
 			unsigned long mask = filedata->mask;
+			devdata = container_of(file_inode(file)->i_cdev, pu32gpio_devdata_t, cdev);
 			hwdrvgpio_configureio (&devdata->hwdev, ((arg & mask) | (arg & ~mask)));
 			ret = 0;
 			break;
 		case GPIO_IOCTL_DBNCR_HZ:
+			devdata = container_of(file_inode(file)->i_cdev, pu32gpio_devdata_t, cdev);
 			hwdrvgpio_setdebounce (&devdata->hwdev, (devdata->hwdev.clkfreq / arg));
 			ret = 0;
+			break;
+		case GPIO_IOCTL_IOCNT:
+			devdata = container_of(file_inode(file)->i_cdev, pu32gpio_devdata_t, cdev);
+			ret = devdata->hwdev.iocnt;
 			break;
 		default:
 			ret = -ENOIOCTLCMD;
