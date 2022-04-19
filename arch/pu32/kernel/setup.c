@@ -121,7 +121,7 @@ static char *pu32devidtoname[] = {
 	,[6] = "GPIO"
 	,[7] = "DevTbl"
 	,[8] = "SpiMaster"
-	,[9] = "PDM"
+	,[9] = "PWM"
 };
 
 static void __init init_resources (void) {
