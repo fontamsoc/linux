@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# (c) William Fonkou Tambe
+
+config PU32FBDEV
+	tristate "PU32 FrameBuffer Device Driver"
+	depends on FB && HIGH_RES_TIMERS
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
+	help
+	  Support for PU32 FrameBuffer device.
+
+	  To compile this driver as a module, choose M here,
+	  the module will be called pu32fbdev.

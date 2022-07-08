@@ -122,6 +122,7 @@ static char *pu32devidtoname[] = {
 	,[7] = "DevTbl"
 	,[8] = "SpiMaster"
 	,[9] = "PWM"
+	,[10] = "FrameBuffer"
 };
 
 static void __init init_resources (void) {

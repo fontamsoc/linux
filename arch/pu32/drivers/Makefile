@@ -3,3 +3,4 @@
 
 obj-${CONFIG_PU32HDD} += pu32hdd/
 obj-${CONFIG_PU32GPIO} += pu32gpio/
+obj-${CONFIG_PU32FBDEV} += pu32fbdev/
