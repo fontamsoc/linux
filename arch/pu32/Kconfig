@@ -76,6 +76,10 @@ config HZ
         int
         default 100
 
+config FORCE_MAX_ZONEORDER
+        int
+        default 13
+
 # TODO: Must be kept 0 until there is a way to guarantee
 # that kernel stacks are naturally aligned; otherwise checks
 # such as (sp & ~(THREAD_SIZE-1)) will fail to compute
