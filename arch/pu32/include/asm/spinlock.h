@@ -70,7 +70,7 @@ static inline void arch_read_lock (arch_rwlock_t *m) {
 			cpu_relax();
 		while (xchg(&m->lock[0/*LOCK*/], 1))
 			cpu_relax();
-		xchg(&m->lock[2/*CURRENT*/], (m->lock[2/*CURRENT*/]+1)); // memory fenced version of: ++m->lock[2/*CURRENT*/];
+		xchg(&m->lock[2/*CURRENT*/], (i+1)); // memory fenced version of: ++m->lock[2/*CURRENT*/];
 	}
 	++m->lock[3/*READERCNT*/];
 	xchg(&m->lock[0/*LOCK*/], 0); // memory fenced version of: m->lock[0/*LOCK*/] = 0;
