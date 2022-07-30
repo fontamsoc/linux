@@ -252,6 +252,21 @@ static int __init pu32hdd_init (void) {
 		goto out;
 	pu32hdd_dev.capacity = // Device capacity in pu32hdd_dev.sectorsz size.
 		((pu32hdd_dev.capacity * BLKSZ) / pu32hdd_dev.sectorsz);
+	struct request_queue *blk_mq_init_sq_queue (
+		struct blk_mq_tag_set *set,
+		const struct blk_mq_ops *ops,
+		unsigned int queue_depth,
+		unsigned int set_flags) {
+		struct request_queue *q;
+		int ret;
+		ret = blk_mq_alloc_sq_tag_set(set, ops, queue_depth, set_flags);
+		if (ret)
+			return ERR_PTR(ret);
+		q = blk_mq_init_queue(set);
+		if (IS_ERR(q))
+			blk_mq_free_tag_set(set);
+		return q;
+	}
 	pu32hdd_dev.queue = blk_mq_init_sq_queue (
 		&pu32hdd_dev.tag_set, &pu32hdd_mq_ops, 128,
 		BLK_MQ_F_SHOULD_MERGE);
