@@ -151,7 +151,7 @@ void flush_thread (void) {}
 
 unsigned long get_wchan (struct task_struct *tsk) {
 
-	if (!tsk || tsk == current || tsk->state == TASK_RUNNING)
+	if (!tsk || tsk == current || task_is_running(tsk))
 		return 0;
 
 	if (!task_stack_page(tsk))
