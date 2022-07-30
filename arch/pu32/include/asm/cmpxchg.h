@@ -4,7 +4,7 @@
 #ifndef __ASM_PU32_CMPXCHG_H
 #define __ASM_PU32_CMPXCHG_H
 
-#define xchg(p, n)					\
+#define arch_xchg(p, n)					\
 ({							\
 	__typeof__(p) _p_ = (p);			\
 	__typeof__(n) _n_ = (n);			\
@@ -34,7 +34,7 @@
 	_n_;						\
 })
 
-#define cmpxchg(p, o, n)					\
+#define arch_cmpxchg(p, o, n)					\
 ({								\
 	__typeof__(p) _p_ = (p);				\
 	__typeof__(n) _n_ = (n);				\
