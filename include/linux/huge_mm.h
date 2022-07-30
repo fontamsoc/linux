@@ -330,7 +330,7 @@ static inline struct list_head *page_deferred_list(struct page *page)
 #else /* CONFIG_TRANSPARENT_HUGEPAGE */
 #define HPAGE_PMD_SHIFT ({ BUILD_BUG(); 0; })
 #define HPAGE_PMD_MASK ({ BUILD_BUG(); 0; })
-#define HPAGE_PMD_SIZE ({ BUILD_BUG(); 0; })
+#define HPAGE_PMD_SIZE ({ /*BUILD_BUG();*/ 0; })
 
 #define HPAGE_PUD_SHIFT ({ BUILD_BUG(); 0; })
 #define HPAGE_PUD_MASK ({ BUILD_BUG(); 0; })
