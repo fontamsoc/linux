@@ -178,9 +178,6 @@ void pu32_start_smp (void) {
 	pr_info("CPU%u online\n", (unsigned int)raw_smp_processor_id());
 	complete(&cpu_up_flag);
 
-	// Disable preemption before enabling interrupts, so we don't
-	// try to schedule a CPU that hasn't actually started yet.
-	preempt_disable();
 	void pu32_clockevent_init (void); pu32_clockevent_init();
 	pu32ctxswitchhdlr();
 	raw_local_irq_enable();
