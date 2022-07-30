@@ -16,8 +16,6 @@ static inline void pmd_populate (
 	set_pmd (pmd, __pmd ((virt_to_pfn(page_address(pte)) << PAGE_SHIFT) | _PAGE_PRESENT));
 }
 
-#define pmd_pgtable(pmd) pmd_page(pmd)
-
 static inline pgd_t *pgd_alloc (
 	struct mm_struct *mm) {
 	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_ATOMIC);
