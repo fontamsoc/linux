@@ -358,7 +358,7 @@ static int __init pu32tty_create_driver (void) {
 	ret = tty_register_driver(pu32tty_driver);
 	if (ret) {
 		pr_err("unable to register console TTY driver\n");
-		goto err_put_tty_driver;
+		goto err_tty_driver_kref_put;
 	}
 
 	pu32tty_wq = create_workqueue("ttyS");
@@ -407,8 +407,8 @@ static int __init pu32tty_create_driver (void) {
 	destroy_workqueue(pu32tty_wq);
 	err_tty_unregister_driver:
 	tty_unregister_driver(pu32tty_driver);
-	err_put_tty_driver:
-	put_tty_driver(pu32tty_driver);
+	err_tty_driver_kref_put:
+	tty_driver_kref_put(pu32tty_driver);
 	err:
 
 	return ret;
@@ -422,7 +422,7 @@ static void pu32tty_destroy_driver (void) {
 	flush_workqueue(pu32tty_wq);
 	destroy_workqueue(pu32tty_wq);
 	tty_unregister_driver(pu32tty_driver);
-	put_tty_driver(pu32tty_driver);
+	tty_driver_kref_put(pu32tty_driver);
 }
 module_exit(pu32tty_destroy_driver);
 
