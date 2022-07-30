@@ -183,7 +183,7 @@ static int pu32tty_tty_ops_write (struct tty_struct *tty, const unsigned char *s
 	return n;
 }
 
-static int pu32tty_tty_ops_write_room (struct tty_struct *tty) {
+static unsigned int pu32tty_tty_ops_write_room (struct tty_struct *tty) {
 	return 32768; // No limit, no buffer used.
 }
 
