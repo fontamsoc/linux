@@ -91,7 +91,6 @@ static struct pu32hdd_device {
 	unsigned long capacity;
 	struct gendisk *gd;
 	struct blk_mq_tag_set tag_set;
-	struct request_queue *queue;
 } pu32hdd_dev = { .major_num = 0, .sectorsz = KERNEL_SECTOR_SIZE /* TODO: A diffent value like 2048 always fail */, };
 
 static DECLARE_WAIT_QUEUE_HEAD(pu32hdd_wq);
@@ -252,22 +251,26 @@ static int __init pu32hdd_init (void) {
 		goto out;
 	pu32hdd_dev.capacity = // Device capacity in pu32hdd_dev.sectorsz size.
 		((pu32hdd_dev.capacity * BLKSZ) / pu32hdd_dev.sectorsz);
-	struct request_queue *blk_mq_init_sq_queue (
+
+
+
+
+	struct gendisk *blk_mq_init_sq_queue (
 		struct blk_mq_tag_set *set,
 		const struct blk_mq_ops *ops,
 		unsigned int queue_depth,
 		unsigned int set_flags) {
-		struct request_queue *q;
 		int ret;
 		ret = blk_mq_alloc_sq_tag_set(set, ops, queue_depth, set_flags);
 		if (ret)
 			return ERR_PTR(ret);
-		q = blk_mq_init_queue(set);
-		if (IS_ERR(q))
+
+		struct gendisk *gd = blk_mq_alloc_disk(set, NULL);
+		if (IS_ERR(gd))
 			blk_mq_free_tag_set(set);
-		return q;
+		return gd;
 	}
-	pu32hdd_dev.queue = blk_mq_init_sq_queue (
+	pu32hdd_dev.gd = blk_mq_init_sq_queue (
 		&pu32hdd_dev.tag_set, &pu32hdd_mq_ops, 128,
 		BLK_MQ_F_SHOULD_MERGE);
 	if (pu32hdd_dev.queue == NULL)
@@ -275,21 +278,36 @@ static int __init pu32hdd_init (void) {
 	pu32hdd_dev.queue->queuedata = &pu32hdd_dev;
 	blk_queue_logical_block_size (pu32hdd_dev.queue, pu32hdd_dev.sectorsz);
 	blk_queue_physical_block_size (pu32hdd_dev.queue, pu32hdd_dev.sectorsz);
+
+
+
+
+
 	pu32hdd_dev.major_num = register_blkdev(pu32hdd_dev.major_num, "hd");
 	if (pu32hdd_dev.major_num <= 0) {
 		printk(KERN_WARNING "pu32hdd: unable to get major number\n");
 		goto out_blk_cleanup_queue;
 	}
-	pu32hdd_dev.gd = alloc_disk(MAX_MINORS);
-	if (!pu32hdd_dev.gd)
+
+	if (!pu32hdd_dev.gd) // TODO:
 		goto out_unregister_blkdev;
+
+
+
+
 	pu32hdd_dev.gd->major = pu32hdd_dev.major_num;
 	pu32hdd_dev.gd->first_minor = 0;
 	pu32hdd_dev.gd->fops = &pu32hdd_ops;
 	pu32hdd_dev.gd->private_data = &pu32hdd_dev;
 	strcpy (pu32hdd_dev.gd->disk_name, "hda");
 	set_capacity(pu32hdd_dev.gd, pu32hdd_dev.capacity*(pu32hdd_dev.sectorsz/KERNEL_SECTOR_SIZE));
+
+
+
 	pu32hdd_dev.gd->queue = pu32hdd_dev.queue;
+
+
+
 	add_disk(pu32hdd_dev.gd);
 	return 0;
 	out_unregister_blkdev:
@@ -303,10 +321,10 @@ static int __init pu32hdd_init (void) {
 static void __exit pu32hdd_exit (void) {
 	if (pu32hdd_irq != -1)
 		pu32hdd_irq_free();
-	del_gendisk(pu32hdd_dev.gd);
-	put_disk(pu32hdd_dev.gd);
 	unregister_blkdev (pu32hdd_dev.major_num, "hd");
-	blk_cleanup_queue(pu32hdd_dev.queue);
+	del_gendisk(pu32hdd_dev.gd);
+	blk_cleanup_disk(pu32hdd_dev.gd);
+	blk_mq_free_tag_set(&pu32hdd_dev.tag_set);
 }
 
 module_init(pu32hdd_init);
