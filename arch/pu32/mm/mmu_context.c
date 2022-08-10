@@ -26,9 +26,14 @@ unsigned long get_mmu_context (void) {
 	#endif
 
 	unsigned long context = find_next_zero_bit (mmu_context, PU32_NR_ASIDS, last_mmu_context+1);
-	if (context == PU32_NR_ASIDS)
-		context = PU32_NO_CONTEXT;
-	else
+	if (context == PU32_NR_ASIDS) {
+		if (last_mmu_context != PU32_NO_CONTEXT)
+			context = find_next_zero_bit (mmu_context, PU32_NR_ASIDS, PU32_NO_CONTEXT+1);
+		if (context == PU32_NR_ASIDS)
+			context = PU32_NO_CONTEXT;
+	}
+
+	if (context != PU32_NO_CONTEXT)
 		__set_bit (context, mmu_context);
 
 	last_mmu_context = context;
