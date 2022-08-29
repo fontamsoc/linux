@@ -237,6 +237,12 @@ static int __init pu32gpio_init (void) {
 				devdata->irq = hwdrvdevtbl_dev.intridx;
 		} else
 			devdata->irq = -1;
+		pr_info("%s[%lu] @0x%lx irq(%d) freq(%lu)\n",
+			str,
+			devdata->hwdev.iocnt,
+			(unsigned long)devdata->hwdev.addr,
+			devdata->irq,
+			devdata->hwdev.clkfreq);
 	}
 	if (!i)
 		goto err;
