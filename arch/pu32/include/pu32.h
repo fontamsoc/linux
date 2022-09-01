@@ -431,38 +431,38 @@ static inline char *pu32sysopcodestr (unsigned long sysopcode) {
 			break;
 		case 0x74:
 			// Specification from the instruction set manual:
-			// vld8 %gpr1, %gpr2 |14|100|rrrr|rrrr|
-			o += snprintf (&pu32strbuf[o], PU32STRBUFSZ-o, "vld8 ");
+			// ld8v %gpr1, %gpr2 |14|100|rrrr|rrrr|
+			o += snprintf (&pu32strbuf[o], PU32STRBUFSZ-o, "ld8v ");
 			decode2gpr();
 			break;
 		case 0x75:
 			// Specification from the instruction set manual:
-			// vld16 %gpr1, %gpr2 |14|101|rrrr|rrrr|
-			o += snprintf (&pu32strbuf[o], PU32STRBUFSZ-o, "vld16 ");
+			// ld16v %gpr1, %gpr2 |14|101|rrrr|rrrr|
+			o += snprintf (&pu32strbuf[o], PU32STRBUFSZ-o, "ld16v ");
 			decode2gpr();
 			break;
 		case 0x76:
 			// Specification from the instruction set manual:
-			// vld32 %gpr1, %gpr2 |14|110|rrrr|rrrr|
-			o += snprintf (&pu32strbuf[o], PU32STRBUFSZ-o, "vld32 ");
+			// ld32v %gpr1, %gpr2 |14|110|rrrr|rrrr|
+			o += snprintf (&pu32strbuf[o], PU32STRBUFSZ-o, "ld32v ");
 			decode2gpr();
 			break;
 		case 0x70:
 			// Specification from the instruction set manual:
-			// vst8 %gpr1, %gpr2 |14|000|rrrr|rrrr|
-			o += snprintf (&pu32strbuf[o], PU32STRBUFSZ-o, "vst8 ");
+			// st8v %gpr1, %gpr2 |14|000|rrrr|rrrr|
+			o += snprintf (&pu32strbuf[o], PU32STRBUFSZ-o, "st8v ");
 			decode2gpr();
 			break;
 		case 0x71:
 			// Specification from the instruction set manual:
-			// vst16 %gpr1, %gpr2 |14|001|rrrr|rrrr|
-			o += snprintf (&pu32strbuf[o], PU32STRBUFSZ-o, "vst16 ");
+			// st16v %gpr1, %gpr2 |14|001|rrrr|rrrr|
+			o += snprintf (&pu32strbuf[o], PU32STRBUFSZ-o, "st16v ");
 			decode2gpr();
 			break;
 		case 0x72:
 			// Specification from the instruction set manual:
-			// vst32 %gpr1, %gpr2 |14|010|rrrr|rrrr|
-			o += snprintf (&pu32strbuf[o], PU32STRBUFSZ-o, "vst32 ");
+			// st32v %gpr1, %gpr2 |14|010|rrrr|rrrr|
+			o += snprintf (&pu32strbuf[o], PU32STRBUFSZ-o, "st32v ");
 			decode2gpr();
 			break;
 		case 0xf8:
