@@ -59,6 +59,7 @@ void start_thread (struct pt_regs *regs, unsigned long pc, unsigned long sp) {
 	// as it is the one that is going to be used when resuming in userspace.
 	regs = &ppr->regs;
 	regs->sp = sp;
+	regs->r1 = 0; // glibc _start() implemented at sysdeps/pu32/start.S expects %1 to be null.
 	regs->fp = 0;
 	void __tramp_exit (int exit_status);
 	regs->rp = (unsigned long)__tramp_exit;
