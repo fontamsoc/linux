@@ -1,7 +1,8 @@
 
 KBUILD_CFLAGS += -ffixed-%10
 #KBUILD_CFLAGS += -pipe
-KBUILD_CFLAGS += -Og -g3 -mzpoprp -save-temps -fverbose-asm -DPU32_DEBUG_disable_check_copy_size
+KBUILD_CFLAGS += -Og -g3 -mzpoprp -DPU32_DEBUG_disable_check_copy_size
+#KBUILD_CFLAGS += -save-temps -fverbose-asm
 KBUILD_CFLAGS += -fno-builtin -Werror=implicit-function-declaration -fno-trampolines -Wno-declaration-after-statement
 KBUILD_AFLAGS += $(KBUILD_CFLAGS)
 
