@@ -27,7 +27,7 @@ static void __show_regs (struct pt_regs *regs, const char *loglvl) {
 		asm volatile ("setkgpr %0, %%7"  : "=r"(uregs.r7));
 		asm volatile ("setkgpr %0, %%8"  : "=r"(uregs.r8));
 		asm volatile ("setkgpr %0, %%9"  : "=r"(uregs.r9));
-		asm volatile ("setkgpr %0, %%10" : "=r"(uregs.r10));
+		asm volatile ("setkgpr %0, %%tp" : "=r"(uregs.tp));
 		asm volatile ("setkgpr %0, %%11" : "=r"(uregs.r11));
 		asm volatile ("setkgpr %0, %%12" : "=r"(uregs.r12));
 		asm volatile ("setkgpr %0, %%sr" : "=r"(uregs.sr));
@@ -44,8 +44,8 @@ static void __show_regs (struct pt_regs *regs, const char *loglvl) {
 		"%ssp(0x%lx) r1(0x%lx) r2(0x%lx) r3(0x%lx) r4(0x%lx) r5(0x%lx) r6(0x%lx) r7(0x%lx)\n", loglvl,
 		regs->sp, regs->r1, regs->r2, regs->r3, regs->r4, regs->r5, regs->r6, regs->r7);
 	printk (
-		"%sr8(0x%lx) r9(0x%lx) r10(0x%lx) r11(0x%lx) r12(0x%lx) sr(0x%lx) fp(0x%lx)\n", loglvl,
-		regs->r8, regs->r9, regs->r10, regs->r11, regs->r12, regs->sr, regs->fp);
+		"%sr8(0x%lx) r9(0x%lx) tp(0x%lx) r11(0x%lx) r12(0x%lx) sr(0x%lx) fp(0x%lx)\n", loglvl,
+		regs->r8, regs->r9, regs->tp, regs->r11, regs->r12, regs->sr, regs->fp);
 }
 
 void show_regs (struct pt_regs *regs) {
@@ -122,7 +122,7 @@ long arch_ptrace (
 	int ret;
 	switch (request) {
 		case PTRACE_GET_THREAD_AREA:
-			ret = put_user(task_thread_info(child)->tls, (unsigned long __user *)data);
+			ret = put_user(task_pt_regs(child)->tp, (unsigned long __user *)data);
 			break;
 		default:
 			ret = ptrace_request(child, request, addr, data);

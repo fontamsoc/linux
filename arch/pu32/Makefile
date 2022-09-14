@@ -1,5 +1,4 @@
 
-KBUILD_CFLAGS += -ffixed-%10
 #KBUILD_CFLAGS += -pipe
 KBUILD_CFLAGS += -O3 -g3 -mzpoprp
 #KBUILD_CFLAGS += -save-temps -fverbose-asm

@@ -29,7 +29,6 @@ struct thread_info {
 	mm_segment_t		addr_limit;
 	unsigned long		in_fault; // Tell whether the thread is executing do_fault().
 	pu32FaultReason	faultreason; // Used to save pu32FaultReason when in_fault is non-null.
-	unsigned long		tls;
 	unsigned long		ksp, kr1, kpc;
 	unsigned long		pu32flags; // flags to use in userspace.
 	struct pt_regs		*irq_regs;
@@ -66,7 +65,6 @@ static inline unsigned long pu32_in_userspace (struct thread_info *ti) {
 	tsk_ti->preempt_count = orig_ti->preempt_count;				\
 	tsk_ti->addr_limit = orig_ti->addr_limit;				\
 	tsk_ti->in_fault = orig_ti->in_fault;					\
-	tsk_ti->tls = orig_ti->tls;						\
 	if (!(orig->flags&PF_KTHREAD)) {					\
 		unsigned long orig_ti_ksp = orig_ti->ksp;			\
 		unsigned long tsk_ti_ksp = (					\
@@ -86,7 +84,6 @@ static inline unsigned long pu32_in_userspace (struct thread_info *ti) {
 	.preempt_count	= INIT_PREEMPT_COUNT,		\
 	.addr_limit	= KERNEL_DS,			\
 	.in_fault	= 0,				\
-	.tls		= 0,				\
 	.pu32flags	= PU32_FLAGS_KERNELSPACE,	\
 }
 

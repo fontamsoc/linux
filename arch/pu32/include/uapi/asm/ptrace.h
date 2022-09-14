@@ -15,7 +15,7 @@ struct pt_regs {
 	unsigned long r7;
 	unsigned long r8;
 	unsigned long r9;
-	unsigned long r10;
+	unsigned long tp;
 	unsigned long r11;
 	unsigned long r12;
 	unsigned long sr;

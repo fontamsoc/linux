@@ -120,7 +120,7 @@ int copy_thread (
 		if (usp) // Setup usermode stack if specified.
 			ppr->regs.sp = usp;
 		if (clone_flags & CLONE_SETTLS)
-			pti->tls = tls;
+			ppr->regs.tp = tls;
 
 		unsigned long sp = (unsigned long)ppr;
 
@@ -283,18 +283,6 @@ __attribute__((__noinline__,optimize("O1"))) void pu32ctxswitchhdlr (void) {
 								// 	int getcpu(unsigned *cpu, unsigned *node, void *unused);
 								// - __NR_gettimeofday:
 								// 	int gettimeofday(struct timeval *tv, struct timezone *tz);
-
-								case __NR_settls: {
-									asm volatile ("setkgpr %0, %%1" : "=r"(ti->tls));
-									asm volatile ("getuip %%sr; inc8 %%sr, 2; setuip %%sr":);
-									goto sysret;
-								}
-
-								case __NR_gettls: {
-									asm volatile ("setugpr %%1, %0" :: "r"(ti->tls));
-									asm volatile ("getuip %%sr; inc8 %%sr, 2; setuip %%sr":);
-									goto sysret;
-								}
 							}
 
 							save_pu32umode_regs(ti, PU32_PT_REGS_WHICH_ALL, pu32SysOpIntr, sysopcode);
