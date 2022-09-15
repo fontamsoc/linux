@@ -9,12 +9,12 @@
 #include <asm/thread_info.h>
 
 static inline struct pt_regs *get_irq_regs (void) {
-	return current_thread_info()->regs;
+	return current_thread_info()->irq_regs;
 }
 
 static inline struct pt_regs *set_irq_regs (struct pt_regs *new_regs) {
 	struct pt_regs *old_regs = get_irq_regs();
-	current_thread_info()->regs = new_regs;
+	current_thread_info()->irq_regs = new_regs;
 	return old_regs;
 }
 
