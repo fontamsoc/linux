@@ -187,7 +187,7 @@ unsigned long pu32_kernelmode_stack[NR_CPUS];
 // used instead of printk() or pr_*() functions.
 // All pu32core must run this function,
 // as it does work common to all cores.
-__attribute__((__noinline__)) void pu32ctxswitchhdlr (void) {
+__attribute__((__noinline__,optimize("O1"))) void pu32ctxswitchhdlr (void) {
 
 	struct task_struct *tsk = current_thread_info()->task;
 	pu32_cpu_curr[raw_smp_processor_id()] = tsk;
