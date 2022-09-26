@@ -68,29 +68,21 @@ early_param ("pu32hdd_usebios", pu32hdd_param_usebios_fn);
 
 extern unsigned long pu32_ishw;
 
-// We can tweak our hardware sector size, but the kernel
-// talks to us in terms of small sectors, always.
-#define KERNEL_SECTOR_SIZE SECTOR_SIZE
-
 // PU32_BIOS_FD_STORAGEDEV block size in bytes.
 #define BLKSZ 512
 
-#if KERNEL_SECTOR_SIZE < BLKSZ
-#error KERNEL_SECTOR_SIZE less than PU32_BIOS_FD_STORAGEDEV BLKSZ
+// We can tweak our hardware sector size, but the kernel
+// talks to us in terms of small sectors, always.
+#if SECTOR_SIZE < BLKSZ
+#error SECTOR_SIZE less than PU32_BIOS_FD_STORAGEDEV BLKSZ
 #endif
-
-// Maximum number of minor numbers that this disk can have.
-// Minor numbers correspond to partitions.
-#define MAX_MINORS 16
 
 // Internal representation of device.
 static struct pu32hdd_device {
-	int major_num;
-	unsigned long sectorsz;
 	unsigned long capacity;
 	struct gendisk *gd;
 	struct blk_mq_tag_set tag_set;
-} pu32hdd_dev = { .major_num = 0, .sectorsz = KERNEL_SECTOR_SIZE /* TODO: A diffent value like 2048 always fail */, };
+} pu32hdd_dev;
 
 static DECLARE_WAIT_QUEUE_HEAD(pu32hdd_wq);
 
@@ -119,8 +111,8 @@ static int pu32hdd_do_request (struct request *rq, unsigned int *nr_bytes) {
 	struct bio_vec bvec;
 	struct req_iterator iter;
 	struct pu32hdd_device *dev = rq->q->queuedata;
-	loff_t pos = (blk_rq_pos(rq) * dev->sectorsz /* TODO: KERNEL_SECTOR_SIZE seem to be always wanted here */);
-	loff_t devsz = (loff_t)(dev->capacity * dev->sectorsz);
+	loff_t pos = (blk_rq_pos(rq) * SECTOR_SIZE);
+	loff_t devsz = (loff_t)(dev->capacity * SECTOR_SIZE);
 	// Iterate over all requests segments.
 	rq_for_each_segment (bvec, rq, iter) {
 		unsigned long bufsz = bvec.bv_len;
@@ -248,10 +240,10 @@ static int __init pu32hdd_init (void) {
 	}
 	if (!pu32hdd_dev.capacity)
 		goto out;
-	pu32hdd_dev.capacity = // Device capacity in pu32hdd_dev.sectorsz size.
-		((pu32hdd_dev.capacity * BLKSZ) / pu32hdd_dev.sectorsz);
-	pu32hdd_dev.major_num = register_blkdev(pu32hdd_dev.major_num, "hd");
-	if (pu32hdd_dev.major_num <= 0) {
+	pu32hdd_dev.capacity = // Device capacity in SECTOR_SIZE bytes.
+		((pu32hdd_dev.capacity * BLKSZ) / SECTOR_SIZE);
+	int major_num = register_blkdev(0, "hd");
+	if (major_num <= 0) {
 		printk(KERN_WARNING "pu32hdd: unable to get major number\n");
 		goto out;
 	}
@@ -266,19 +258,19 @@ static int __init pu32hdd_init (void) {
 	pu32hdd_dev.gd = blk_mq_alloc_disk(&pu32hdd_dev.tag_set, &pu32hdd_dev);
 	if (IS_ERR(pu32hdd_dev.gd))
 		goto out_unregister_blkdev;
-	pu32hdd_dev.gd->major = pu32hdd_dev.major_num;
+	pu32hdd_dev.gd->major = major_num;
 	pu32hdd_dev.gd->first_minor = 0;
 	pu32hdd_dev.gd->minors = 128;
 	pu32hdd_dev.gd->fops = &pu32hdd_ops;
 	pu32hdd_dev.gd->private_data = &pu32hdd_dev;
 	strcpy (pu32hdd_dev.gd->disk_name, "hda");
-	blk_queue_logical_block_size (pu32hdd_dev.gd->queue, pu32hdd_dev.sectorsz);
-	blk_queue_physical_block_size (pu32hdd_dev.gd->queue, pu32hdd_dev.sectorsz);
-	set_capacity(pu32hdd_dev.gd, pu32hdd_dev.capacity*(pu32hdd_dev.sectorsz/KERNEL_SECTOR_SIZE));
+	blk_queue_logical_block_size (pu32hdd_dev.gd->queue, SECTOR_SIZE);
+	blk_queue_physical_block_size (pu32hdd_dev.gd->queue, SECTOR_SIZE);
+	set_capacity(pu32hdd_dev.gd, pu32hdd_dev.capacity);
 	add_disk(pu32hdd_dev.gd);
 	return 0;
 	out_unregister_blkdev:
-	unregister_blkdev (pu32hdd_dev.major_num, "hd");
+	unregister_blkdev (major_num, "hd");
 	out:
 	return -EIO;
 }
@@ -286,9 +278,10 @@ static int __init pu32hdd_init (void) {
 static void __exit pu32hdd_exit (void) {
 	if (pu32hdd_irq != -1)
 		pu32hdd_irq_free();
+	int major_num = pu32hdd_dev.gd->major;
 	del_gendisk(pu32hdd_dev.gd);
 	blk_cleanup_disk(pu32hdd_dev.gd);
-	unregister_blkdev (pu32hdd_dev.major_num, "hd");
+	unregister_blkdev (major_num, "hd");
 }
 
 module_init(pu32hdd_init);
