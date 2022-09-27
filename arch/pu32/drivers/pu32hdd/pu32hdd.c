@@ -83,6 +83,7 @@ static struct pu32hdd_device {
 	unsigned long capacity;
 	struct gendisk *gd;
 	struct blk_mq_tag_set tag_set;
+	spinlock_t lock;
 } pu32hdd_dev;
 
 static DECLARE_WAIT_QUEUE_HEAD(pu32hdd_wq);
@@ -107,76 +108,70 @@ static irqreturn_t pu32hdd_isr (int _, void *__) {
 	return IRQ_HANDLED;
 }
 
-// Serve requests.
-static int pu32hdd_do_request (struct request *rq, unsigned int *nr_bytes) {
-	struct bio_vec bvec;
-	struct req_iterator iter;
+static blk_status_t pu32hdd_do_request (struct request *rq) {
 	struct pu32hdd_device *dev = rq->q->queuedata;
-	loff_t pos = (blk_rq_pos(rq) * SECTOR_SIZE);
 	loff_t devsz = (loff_t)(dev->capacity * SECTOR_SIZE);
-	// Iterate over all requests segments.
-	rq_for_each_segment (bvec, rq, iter) {
-		unsigned long bufsz = bvec.bv_len;
-		void* buf = (page_address(bvec.bv_page) + bvec.bv_offset);
-		if ((pos + bufsz) > devsz)
-			bufsz = (unsigned long)(devsz - pos);
-		if (pu32hdd_irq != -1)
-			hwdrvintctrl_ena (pu32hdd_irq, (pu32hdd_param_hw_en && pu32hdd_param_irq_en));
-		unsigned long i = 0;
-		if (pu32hdd_param_hw_en) {
-			signed long ret;
-			if (rq_data_dir(rq) == WRITE) {
-				while (i < bufsz) {
-					do {
-						if ((ret = hwdrvblkdev_isrdy (&hwdrvblkdev_dev)) == -1)
-							return -EIO;
-					} while (ret == 0);
-					hwdrvblkdev_rqst = 1;
-					hwdrvblkdev_write (&hwdrvblkdev_dev, buf+i, (pos+i)/BLKSZ, ((i + BLKSZ) < bufsz));
-					i += BLKSZ;
-				}
-			} else {
-				while (i < bufsz) {
-					do {
-						do {
-							if ((ret = hwdrvblkdev_isrdy (&hwdrvblkdev_dev)) == -1)
-								return -EIO;
-						} while (ret == 0);
-						hwdrvblkdev_rqst = 1;
-					} while (!hwdrvblkdev_read (&hwdrvblkdev_dev, buf+i, (pos+i)/BLKSZ, ((i + BLKSZ) < bufsz)));
-					i += BLKSZ;
-				}
+	loff_t pos = (blk_rq_pos(rq) * SECTOR_SIZE);
+	unsigned long bufsz = blk_rq_cur_bytes(rq);
+	void* buf = bio_data(rq->bio);
+	if ((pos + bufsz) > devsz)
+		bufsz = (unsigned long)(devsz - pos);
+	if (pu32hdd_irq != -1)
+		hwdrvintctrl_ena (pu32hdd_irq, (pu32hdd_param_hw_en && pu32hdd_param_irq_en));
+	unsigned long i = 0;
+	if (pu32hdd_param_hw_en) {
+		signed long ret;
+		if (rq_data_dir(rq) == WRITE) {
+			while (i < bufsz) {
+				do {
+					if ((ret = hwdrvblkdev_isrdy (&hwdrvblkdev_dev)) == -1)
+						return BLK_STS_IOERR;
+				} while (ret == 0);
+				hwdrvblkdev_rqst = 1;
+				hwdrvblkdev_write (&hwdrvblkdev_dev, buf+i, (pos+i)/BLKSZ, ((i + BLKSZ) < bufsz));
+				i += BLKSZ;
 			}
 		} else {
-			if (((loff_t)pu32syslseek (PU32_BIOS_FD_STORAGEDEV, pos/BLKSZ, SEEK_SET) * BLKSZ) != pos)
-				return -EIO;
-			if (rq_data_dir(rq) == WRITE) {
-				while (i < bufsz)
-					i += ((loff_t)pu32syswrite (PU32_BIOS_FD_STORAGEDEV, buf+i, (bufsz-i)/BLKSZ) * BLKSZ);
-			} else {
-				while (i < bufsz)
-					i += ((loff_t)pu32sysread (PU32_BIOS_FD_STORAGEDEV, buf+i, (bufsz-i)/BLKSZ) * BLKSZ);
+			while (i < bufsz) {
+				do {
+					do {
+						if ((ret = hwdrvblkdev_isrdy (&hwdrvblkdev_dev)) == -1)
+							return BLK_STS_IOERR;
+					} while (ret == 0);
+					hwdrvblkdev_rqst = 1;
+				} while (!hwdrvblkdev_read (&hwdrvblkdev_dev, buf+i, (pos+i)/BLKSZ, ((i + BLKSZ) < bufsz)));
+				i += BLKSZ;
 			}
 		}
-		pos += bufsz;
-		*nr_bytes += bufsz;
+	} else {
+		if (((loff_t)pu32syslseek (PU32_BIOS_FD_STORAGEDEV, pos/BLKSZ, SEEK_SET) * BLKSZ) != pos)
+			return BLK_STS_IOERR;
+		if (rq_data_dir(rq) == WRITE) {
+			while (i < bufsz)
+				i += ((loff_t)pu32syswrite (PU32_BIOS_FD_STORAGEDEV, buf+i, (bufsz-i)/BLKSZ) * BLKSZ);
+		} else {
+			while (i < bufsz)
+				i += ((loff_t)pu32sysread (PU32_BIOS_FD_STORAGEDEV, buf+i, (bufsz-i)/BLKSZ) * BLKSZ);
+		}
 	}
-	return 0;
+	return BLK_STS_OK;
 }
 
 // Queue callback function.
 static blk_status_t pu32hdd_queue_rq (
 	struct blk_mq_hw_ctx *hctx,
 	const struct blk_mq_queue_data* bd) {
-	unsigned int nr_bytes = 0;
-	blk_status_t status = BLK_STS_OK;
 	struct request *rq = bd->rq;
+	struct pu32hdd_device *dev = rq->q->queuedata;
+	if (!spin_trylock (&dev->lock))
+		return BLK_STS_DEV_RESOURCE;
+	blk_status_t status = BLK_STS_OK;
 	blk_mq_start_request(rq);
-	if (pu32hdd_do_request (rq, &nr_bytes) != 0)
-		status = BLK_STS_IOERR;
-	if (blk_update_request (rq, status, nr_bytes))
-		/* Shouldn't fail */ BUG();
+	do {
+		status = pu32hdd_do_request(rq);
+	} while (blk_update_request(rq, status, blk_rq_cur_bytes(rq)));
 	__blk_mq_end_request (rq, status);
+	spin_unlock (&dev->lock);
 	return status;
 }
 
@@ -243,6 +238,7 @@ static int __init pu32hdd_init (void) {
 		goto out;
 	pu32hdd_dev.capacity = // Device capacity in SECTOR_SIZE bytes.
 		((pu32hdd_dev.capacity * BLKSZ) / SECTOR_SIZE);
+	spin_lock_init(&pu32hdd_dev.lock);
 	int major_num = register_blkdev(0, "hd");
 	if (major_num <= 0) {
 		printk(KERN_WARNING "pu32hdd: unable to get major number\n");
