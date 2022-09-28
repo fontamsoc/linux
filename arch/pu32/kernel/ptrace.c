@@ -85,7 +85,7 @@ void show_stack (struct task_struct *tsk, unsigned long *sp, const char *loglvl)
 	sp = ti->task->stack;
 	printk ("%sstacktrace:\n", loglvl);
 	stacktrace (sp, (unsigned long *)ksp, loglvl);
-	unsigned iskthread = (ti->task->flags&PF_KTHREAD);
+	unsigned iskthread = (ti->task->flags&(PF_KTHREAD | PF_IO_WORKER));
 	struct pu32_pt_regs *eos = (struct pu32_pt_regs *)pu32_stack_bottom(sp);
 	while (1) {
 		if (iskthread) {
