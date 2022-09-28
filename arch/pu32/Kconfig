@@ -4,6 +4,8 @@ config PU32
 	select HAVE_DEBUG_BUGVERBOSE
 	select NO_DMA
 	select ARCH_32BIT_OFF_T
+	select ARCH_USE_QUEUED_SPINLOCKS
+	select ARCH_USE_QUEUED_RWLOCKS
 	select GENERIC_ATOMIC64
 	select GENERIC_LIB_ASHLDI3
 	select GENERIC_LIB_ASHRDI3
@@ -42,14 +44,14 @@ config HOTPLUG_CPU
 config MMU
 	def_bool y
 
-config NUMA
-	bool "NUMA Memory Allocation and Scheduler Support"
-	depends on SMP && MMU
-	default y
-	select GENERIC_ARCH_NUMA
-	select ARCH_SUPPORTS_NUMA_BALANCING
-	help
-	  Enable NUMA (Non-Uniform Memory Access) support.
+#config NUMA
+#	bool "NUMA Memory Allocation and Scheduler Support"
+#	depends on SMP && MMU
+#	default n
+#	select GENERIC_ARCH_NUMA
+#	select ARCH_SUPPORTS_NUMA_BALANCING
+#	help
+#	  Enable NUMA (Non-Uniform Memory Access) support.
 
 # Must be set to clog2(NR_CPUS)
 config NODES_SHIFT
@@ -99,6 +101,9 @@ config GENERIC_CSUM
 
 config STACKTRACE_SUPPORT
 	def_bool y
+
+config LOCKDEP_SUPPORT
+	def_bool  y
 
 config HW_RANDOM
 	default n

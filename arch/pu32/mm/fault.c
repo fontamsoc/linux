@@ -170,7 +170,7 @@ exception:;
 		goto done;
 	}
 
-	if (!(tsk->flags&PF_KTHREAD)) {
+	if (!(tsk->flags&(PF_KTHREAD | PF_IO_WORKER))) {
 		force_sig_fault(SIGSEGV, SEGV_MAPERR, (void *)addr);
 		ret = -1;
 		goto done;
