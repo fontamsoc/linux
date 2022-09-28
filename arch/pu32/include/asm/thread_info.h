@@ -51,7 +51,7 @@ static inline unsigned long pu32_in_userspace (struct thread_info *ti) {
 	/* To be used after save_pu32umode_regs() or before restore_pu32umode_regs().
 	   This function must be used instead of (!pu32_ret_to_kernelspace()),
 	   because it also checks whether the task is a kernel-thread. */ \
-	(!((ti)->task->flags&PF_KTHREAD) && \
+	(!((ti)->task->flags&(PF_KTHREAD | PF_IO_WORKER)) && \
 		((ti)->ksp == (unsigned long)((struct pu32_pt_regs *)pu32_stack_bottom((ti)->ksp)-1)))
 // setup_thread_stack() does not set ti->pu32flags, ti->ksp (if kernel-thread),
 // ti->kr1, ti->kpc, as they are set by copy_thread().
@@ -65,7 +65,7 @@ static inline unsigned long pu32_in_userspace (struct thread_info *ti) {
 	tsk_ti->preempt_count = orig_ti->preempt_count;				\
 	tsk_ti->addr_limit = orig_ti->addr_limit;				\
 	tsk_ti->in_fault = orig_ti->in_fault;					\
-	if (!(orig->flags&PF_KTHREAD)) {					\
+	if (!(orig->flags&(PF_KTHREAD | PF_IO_WORKER))) {			\
 		unsigned long orig_ti_ksp = orig_ti->ksp;			\
 		unsigned long tsk_ti_ksp = (					\
 			tsk_ti->ksp =						\
