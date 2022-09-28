@@ -114,9 +114,9 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 	do { \
 		struct thread_info *ti = current_thread_info(); \
 		unsigned long pte_val_val = pte_val(val); \
-		asm volatile ("ldst %0, %1" /* does memory fencing as well  */\
-			: "+r" ((unsigned long){(pte_val_val?(pte_val_val|((ti->task->flags&PF_KTHREAD)?0:_PAGE_USER)):0)}) \
-			: "r"  (ptr)); \
+		asm volatile ("stv %0, %1" \
+			:: "r" ((unsigned long){(pte_val_val?(pte_val_val|((ti->task->flags&(PF_KTHREAD | PF_IO_WORKER))?0:_PAGE_USER)):0)}), \
+			   "r"  (ptr)); \
 		/* if above change was done as part of a pagefault,
 		   update_mmu_cache() gets called and updates the tlb */ \
 	} while (0)
@@ -154,8 +154,8 @@ static inline unsigned long pmd_page_vaddr (pmd_t pmd) {
 #define pmd_present(x)		(pmd_val(x) & _PAGE_PRESENT)
 #define pmd_bad(x)		(!pmd_present(x))
 #define set_pmd(ptr, val) \
-	asm volatile ("ldst %0, %1" /* does memory fencing as well  */ \
-		: "+r" ((unsigned long){pmd_val(val)}) : "r" (ptr))
+	asm volatile ("stv %0, %1" \
+		:: "r" ((unsigned long){pmd_val(val)}), "r" (ptr))
 #define set_pmd_at(mm, addr, ptr, val) \
 	set_pmd(ptr, __pmd(pmd_val(val)))
 #define pmd_clear(x) \
