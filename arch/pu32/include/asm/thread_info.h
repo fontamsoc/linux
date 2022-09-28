@@ -47,7 +47,7 @@ static inline unsigned long pu32_in_userspace (struct thread_info *ti) {
 	/* To be used after save_pu32umode_regs() or before restore_pu32umode_regs().
 	   This function must be used instead of (!pu32_ret_to_kernelspace()),
 	   because it also checks whether the task is a kernel-thread. */ \
-	(!((ti)->task->flags&PF_KTHREAD) && \
+	(!((ti)->task->flags&(PF_KTHREAD | PF_IO_WORKER)) && \
 		((ti)->ksp == (unsigned long)((struct pu32_pt_regs *)pu32_stack_bottom((ti)->ksp)-1)))
 // setup_thread_stack() does not set ti->pu32flags, ti->ksp (if kernel-thread),
 // ti->kr1, ti->kpc, as they are set by copy_thread().
@@ -60,7 +60,7 @@ static inline unsigned long pu32_in_userspace (struct thread_info *ti) {
 	tsk_ti->last_cpu = orig_ti->cpu;					\
 	tsk_ti->preempt_count = orig_ti->preempt_count;				\
 	tsk_ti->in_fault = orig_ti->in_fault;					\
-	if (!(orig->flags&PF_KTHREAD)) {					\
+	if (!(orig->flags&(PF_KTHREAD | PF_IO_WORKER))) {			\
 		unsigned long orig_ti_ksp = orig_ti->ksp;			\
 		unsigned long tsk_ti_ksp = (					\
 			tsk_ti->ksp =						\
@@ -101,12 +101,8 @@ static inline struct thread_info *current_thread_info (void) {
 #define TIF_SYSCALL_TRACEPOINT	4	/* syscall tracepoint instrumentation */
 #define TIF_SYSCALL_AUDIT	5	/* syscall auditing */
 #define TIF_NOTIFY_SIGNAL	7       /* signal notifications exist */
-//#define TIF_POLLING_NRFLAG	16	/* poll_idle() is TIF_NEED_RESCHED */
-//#define TIF_MCA_INIT		17	/* this task is processing MCA or INIT */
+#define TIF_POLLING_NRFLAG	16	/* poll_idle() is TIF_NEED_RESCHED */
 #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
-//#define TIF_NOHZ		19	/* in adaptive nohz mode */
-//#define TIF_RESTORE_SIGMASK	20	/* restore signal mask in do_signal() */
-//#define TIF_SECCOMP		21	/* secure computing */
 
 #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
 #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
@@ -115,12 +111,8 @@ static inline struct thread_info *current_thread_info (void) {
 #define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
 #define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
 #define _TIF_NOTIFY_SIGNAL	(1 << TIF_NOTIFY_SIGNAL)
-//#define _TIF_POLLING_NRFLAG	(1 << TIF_POLLING_NRFLAG)
-//#define _TIF_MCA_INIT		(1 << TIF_MCA_INIT)
+#define _TIF_POLLING_NRFLAG	(1 << TIF_POLLING_NRFLAG)
 #define _TIF_MEMDIE		(1 << TIF_MEMDIE)
-//#define _TIF_NOHZ		(1 << TIF_NOHZ)
-//#define _TIF_RESTORE_SIGMASK	(1 << TIF_RESTORE_SIGMASK)
-//#define _TIF_SECCOMP		(1 << TIF_SECCOMP)
 
 #define _TIF_WORK_MASK (_TIF_SIGPENDING | _TIF_NOTIFY_RESUME | _TIF_NEED_RESCHED | \
                         _TIF_NOTIFY_SIGNAL)
