@@ -42,9 +42,9 @@ void __init setup_smp (void) {
 	while (1) {
 		unsigned int old_cpu_up_arg = cpu_up_arg;
 		BUG_ON(_inc_cpu_up_arg_raddr>>16); // Insure address fit in 16bits.
-		asm volatile ("ldst16 %0, %1" /* does memory fencing as well */
-			: "+r" ((unsigned long){_inc_cpu_up_arg_raddr})
-			: "r"  (PARKPU_RLI16IMM_ADDR));
+		asm volatile ("st16v %0, %1"
+			:: "r" ((unsigned long){_inc_cpu_up_arg_raddr}),
+			   "r"  (PARKPU_RLI16IMM_ADDR));
 		unsigned long irqdst;
 		if (pu32_ishw) {
 			hwdrvintctrl_ack(old_cpu_up_arg, 0);
@@ -102,9 +102,9 @@ int __cpu_up (unsigned int cpu, struct task_struct *tidle) {
 	extern char _start_smp[];
 	unsigned long _start_smp_raddr = ((unsigned long)_start_smp - (PARKPU_RLI16IMM_ADDR + 2));
 	BUG_ON(_start_smp_raddr>>16); // Insure address fit in 16bits.
-	asm volatile ("ldst16 %0, %1" /* does memory fencing as well */
-		: "+r" ((unsigned long){_start_smp_raddr})
-		: "r"  (PARKPU_RLI16IMM_ADDR));
+	asm volatile ("st16v %0, %1"
+		:: "r" ((unsigned long){_start_smp_raddr}),
+		   "r"  (PARKPU_RLI16IMM_ADDR));
 
 	int ret = 0;
 	unsigned long irqdst;
