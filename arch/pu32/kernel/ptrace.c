@@ -52,9 +52,8 @@ void show_regs (struct pt_regs *regs) {
 	return __show_regs (regs, KERN_DEFAULT);
 }
 
-// __attribute__((__noinline__)) forces %rp to be saved on the stack.
-__attribute__((__noinline__)) static void stacktrace (
-	unsigned long *start, unsigned long *end, const char *loglvl) {
+__attribute__((__noinline__)) // __attribute__((__noinline__)) forces %rp to be saved on the stack.
+static void stacktrace (unsigned long *start, unsigned long *end, const char *loglvl) {
 	do {
 		unsigned long addr = *start;
 		extern char _text[];
@@ -66,6 +65,7 @@ __attribute__((__noinline__)) static void stacktrace (
 	} while (start < end);
 }
 
+__attribute__((__noinline__)) // __attribute__((__noinline__)) forces %rp to be saved on the stack.
 void show_stack (struct task_struct *tsk, unsigned long *sp, const char *loglvl) {
 	if (sp) {
 		// sp is set when show_stack() is called from pu32-kernelmode.
@@ -79,10 +79,11 @@ void show_stack (struct task_struct *tsk, unsigned long *sp, const char *loglvl)
 		printk ("%s%s: %s\n", loglvl,
 			pu32faultreasonstr (faultreason, 0),
 			pu32sysopcodestr (sysopcode));
-	}
-	struct thread_info *ti = current_thread_info();
+		asm volatile ("setkgpr %0, %%sp" : "=r"(sp));
+	} else
+		asm volatile ("cpy %0, %%sp" : "=r"(sp));
+	struct thread_info *ti = (tsk ? task_thread_info(tsk) : current_thread_info());
 	unsigned long ksp = ti->ksp;
-	sp = ti->task->stack;
 	printk ("%sstacktrace:\n", loglvl);
 	stacktrace (sp, (unsigned long *)ksp, loglvl);
 	unsigned iskthread = (ti->task->flags&(PF_KTHREAD | PF_IO_WORKER));
