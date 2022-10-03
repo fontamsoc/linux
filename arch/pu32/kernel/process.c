@@ -54,6 +54,7 @@ void start_thread (struct pt_regs *regs, unsigned long pc, unsigned long sp) {
 		(struct pu32_pt_regs *)((unsigned long)pu32_stack_bottom(regs) -
 			sizeof(struct pu32_pt_regs));
 	ppr->faultreason = pu32PreemptIntr;
+	ppr->sysopcode = PU32_OPNOTAVAIL;
 	ppr->which = PU32_PT_REGS_WHICH_SPFPRP;
 	// Reset regs to the pu32_pt_regs at the bottom of the thread's kernel-stack,
 	// as it is the one that is going to be used when resuming in userspace.
