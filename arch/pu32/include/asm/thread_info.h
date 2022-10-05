@@ -82,11 +82,10 @@ static inline unsigned long pu32_in_userspace (struct thread_info *ti) {
 }
 
 // Must match CURRENT_THREAD_INFO.
-static inline struct thread_info *current_thread_info (void) {
-	struct thread_info *ti;
-	asm volatile ("cpy %0, %%tp" : "=r"(ti));
-	return ti;
-}
+#define current_thread_info() ({ \
+	struct thread_info *ti; \
+	asm volatile ("cpy %0, %%tp\n" : "=r"(ti)); \
+	ti; })
 
 #endif /* !__ASSEMBLY__ */
 
