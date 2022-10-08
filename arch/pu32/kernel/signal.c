@@ -152,16 +152,19 @@ static void do_signal (void) {
 
 	struct pu32_pt_regs *pu32regs = pu32_ti_pt_regs(current_thread_info());
 
+	unsigned long in_syscall = (
+		(pu32regs->faultreason == pu32SysOpIntr) &&
+		(pu32regs->sysopcode & 0xff) == 0x01);
+
+	struct pt_regs *regs = &pu32regs->regs;
+
+	unsigned long r1 = regs->r1;
+
 	struct ksignal ksig;
 	if (get_signal(&ksig)) {
 		// Deliver the signal.
-
-		// Check whether coming from a syscall.
-		if (pu32regs->faultreason == pu32SysOpIntr) {
-
-			struct pt_regs *regs = &pu32regs->regs;
-
-			switch (regs->r1) {
+		if (in_syscall) {
+			switch (r1) {
 				case -ERESTART_RESTARTBLOCK:
 				case -ERESTARTNOHAND:
 					regs->r1 = -EINTR;
@@ -179,24 +182,16 @@ static void do_signal (void) {
 					break;
 			}
 		}
-
 		signal_setup_done (
 			setup_frame (&ksig, pu32regs),
 			&ksig, 0);
-
 		return;
 	}
 
-	// Check whether coming from a syscall.
-	if (pu32regs->faultreason == pu32SysOpIntr) {
-
-		struct pt_regs *regs = &pu32regs->regs;
-
+	if (in_syscall) {
 		// Restart the system call; no handlers present.
-		switch (regs->r1) {
+		switch (r1) {
 			case -ERESTART_RESTARTBLOCK:
-				regs->sr = __NR_restart_syscall;
-				fallthrough;
 			case -ERESTARTNOHAND:
 			case -ERESTARTSYS:
 			case -ERESTARTNOINTR:
