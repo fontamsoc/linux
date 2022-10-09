@@ -14,7 +14,7 @@ GLOBAL(ret_from_syscall)
 	# %1 has syscall return value.
 	rli %sr, pu32_save_syscall_retval
 	jl %rp, %sr
-ret_from_exception:
+GLOBAL(ret_from_exception)
 	# Implemented as described by diagram at
 	# arch/pu32/doc/ret_from_exception.png .
 	rli %sr, pu32_local_irq_disable

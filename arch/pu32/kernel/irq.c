@@ -18,18 +18,21 @@ EXPORT_SYMBOL(arch_local_save_flags);
 
 // Set interrupt enabled status.
 void arch_local_irq_restore (unsigned long flags) {
+	unsigned long pu32flags = current_thread_info()->pu32flags;
 	if (flags == ARCH_IRQ_DISABLED) {
-		asm volatile (
-			"setflags %0"
-			:: "r"(current_thread_info()->pu32flags |
-				PU32_FLAGS_KERNELSPACE | PU32_FLAGS_disIntr));
+		pu32flags |= PU32_FLAGS_disIntr;
+		__asm__ __volatile__ ("setflags %0\n" :: "r"(pu32flags) : "memory");
+		current_thread_info()->pu32flags = pu32flags;
+		__asm__ __volatile__("" ::: "memory");
 		pu32irqflags[raw_smp_processor_id()] = flags;
+		__asm__ __volatile__("" ::: "memory");
 	} else {
+		pu32flags &= ~PU32_FLAGS_disIntr;
+		current_thread_info()->pu32flags = pu32flags;
+		__asm__ __volatile__("" ::: "memory");
 		pu32irqflags[raw_smp_processor_id()] = flags;
-		asm volatile (
-			"setflags %0"
-			:: "r"(current_thread_info()->pu32flags |
-				PU32_FLAGS_KERNELSPACE));
+		__asm__ __volatile__("" ::: "memory");
+		__asm__ __volatile__ ("setflags %0\n" :: "r"(pu32flags) : "memory");
 	}
 }
 EXPORT_SYMBOL(arch_local_irq_restore);
