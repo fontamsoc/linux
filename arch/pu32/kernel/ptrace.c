@@ -17,23 +17,23 @@ static void __show_regs (struct pt_regs *regs, const char *loglvl) {
 	if (regs == (struct pt_regs *)0 || regs == (struct pt_regs *)-1) {
 		// Assume coming from usermode if regs invalid pointer.
 		struct pt_regs uregs;
-		asm volatile ("setkgpr %0, %%sp" : "=r"(uregs.sp));
-		asm volatile ("setkgpr %0, %%1"  : "=r"(uregs.r1));
-		asm volatile ("setkgpr %0, %%2"  : "=r"(uregs.r2));
-		asm volatile ("setkgpr %0, %%3"  : "=r"(uregs.r3));
-		asm volatile ("setkgpr %0, %%4"  : "=r"(uregs.r4));
-		asm volatile ("setkgpr %0, %%5"  : "=r"(uregs.r5));
-		asm volatile ("setkgpr %0, %%6"  : "=r"(uregs.r6));
-		asm volatile ("setkgpr %0, %%7"  : "=r"(uregs.r7));
-		asm volatile ("setkgpr %0, %%8"  : "=r"(uregs.r8));
-		asm volatile ("setkgpr %0, %%9"  : "=r"(uregs.r9));
-		asm volatile ("setkgpr %0, %%tp" : "=r"(uregs.tp));
-		asm volatile ("setkgpr %0, %%11" : "=r"(uregs.r11));
-		asm volatile ("setkgpr %0, %%12" : "=r"(uregs.r12));
-		asm volatile ("setkgpr %0, %%sr" : "=r"(uregs.sr));
-		asm volatile ("setkgpr %0, %%fp" : "=r"(uregs.fp));
-		asm volatile ("setkgpr %0, %%rp" : "=r"(uregs.rp));
-		asm volatile ("getuip %0"        : "=r"(uregs.pc));
+		asm volatile ("setkgpr %0, %%sp\n" : "=r"(uregs.sp) :: "memory");
+		asm volatile ("setkgpr %0, %%1\n"  : "=r"(uregs.r1) :: "memory");
+		asm volatile ("setkgpr %0, %%2\n"  : "=r"(uregs.r2) :: "memory");
+		asm volatile ("setkgpr %0, %%3\n"  : "=r"(uregs.r3) :: "memory");
+		asm volatile ("setkgpr %0, %%4\n"  : "=r"(uregs.r4) :: "memory");
+		asm volatile ("setkgpr %0, %%5\n"  : "=r"(uregs.r5) :: "memory");
+		asm volatile ("setkgpr %0, %%6\n"  : "=r"(uregs.r6) :: "memory");
+		asm volatile ("setkgpr %0, %%7\n"  : "=r"(uregs.r7) :: "memory");
+		asm volatile ("setkgpr %0, %%8\n"  : "=r"(uregs.r8) :: "memory");
+		asm volatile ("setkgpr %0, %%9\n"  : "=r"(uregs.r9) :: "memory");
+		asm volatile ("setkgpr %0, %%tp\n" : "=r"(uregs.tp) :: "memory");
+		asm volatile ("setkgpr %0, %%11\n" : "=r"(uregs.r11) :: "memory");
+		asm volatile ("setkgpr %0, %%12\n" : "=r"(uregs.r12) :: "memory");
+		asm volatile ("setkgpr %0, %%sr\n" : "=r"(uregs.sr) :: "memory");
+		asm volatile ("setkgpr %0, %%fp\n" : "=r"(uregs.fp) :: "memory");
+		asm volatile ("setkgpr %0, %%rp\n" : "=r"(uregs.rp) :: "memory");
+		asm volatile ("getuip %0\n"        : "=r"(uregs.pc) :: "memory");
 		regs = &uregs;
 	}
 	if (!loglvl)
@@ -70,18 +70,18 @@ void show_stack (struct task_struct *tsk, unsigned long *sp, const char *loglvl)
 	if (sp) {
 		// sp is set when show_stack() is called from pu32-kernelmode.
 		printk ("%sstacktrace(kmode):\n", loglvl);
-		asm volatile ("cpy %0, %%sp" : "=r"(sp));
+		asm volatile ("cpy %0, %%sp\n" : "=r"(sp) :: "memory");
 		stacktrace (sp, (unsigned long *)pu32_stack_bottom(sp), loglvl);
 		pu32FaultReason faultreason;
-		asm volatile ("getfaultreason %0\n" : "=r"(faultreason));
+		asm volatile ("getfaultreason %0\n" : "=r"(faultreason) :: "memory");
 		unsigned long sysopcode;
-		asm volatile ("getsysopcode %0" : "=r"(sysopcode));
+		asm volatile ("getsysopcode %0\n" : "=r"(sysopcode) :: "memory");
 		printk ("%s%s: %s\n", loglvl,
 			pu32faultreasonstr (faultreason, 0),
 			pu32sysopcodestr (sysopcode));
-		asm volatile ("setkgpr %0, %%sp" : "=r"(sp));
+		asm volatile ("setkgpr %0, %%sp\n" : "=r"(sp) :: "memory");
 	} else
-		asm volatile ("cpy %0, %%sp" : "=r"(sp));
+		asm volatile ("cpy %0, %%sp\n" : "=r"(sp) :: "memory");
 	struct thread_info *ti = (tsk ? task_thread_info(tsk) : current_thread_info());
 	unsigned long ksp = ti->ksp;
 	printk ("%sstacktrace:\n", loglvl);

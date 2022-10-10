@@ -215,13 +215,13 @@ static void __init init_resources (void) {
 	// Clean-up any unused pre-allocated resources.
 	mem_res_sz = (res_idx + 1);
 	if (mem_res_sz)
-		memblock_free((unsigned long)mem_res, mem_res_sz * sizeof(*mem_res));
+		memblock_free(mem_res, mem_res_sz * sizeof(*mem_res));
 	return;
 
  err:
 	// Better an empty resource tree than an inconsistent one.
 	release_child_resources(&iomem_resource);
-	memblock_free((unsigned long)mem_res, mem_res_sz);
+	memblock_free(mem_res, mem_res_sz);
 }
 
 #ifdef CONFIG_SMP
@@ -282,7 +282,7 @@ void __init trap_init (void) {}
 
 __attribute__((noreturn)) void __init pu32_start (char **argv, char **envp) {
 	// Adjust %ksl to enable caching throughout the kernel image memory range.
-	asm volatile ("setksl %0\n" :: "r"((void *)_end));
+	asm volatile ("setksl %0\n" :: "r"((void *)_end) : "memory");
 
 	// Zero section .bss .
 	memset32((uint32_t *)__bss_start, 0, ((__bss_stop - __bss_start) / sizeof(uint32_t)));
@@ -321,7 +321,7 @@ __attribute__((noreturn)) void __init pu32_start (char **argv, char **envp) {
 
 		#ifdef CONFIG_PROC_FS
 		c_info_rcache = 1 /* RAMCACHESZ */;
-		asm volatile ("ldst %0, %1" : "+r" (c_info_rcache) : "r"  (DEVTBLADDR));
+		asm volatile ("ldst %0, %1\n" : "+r"(c_info_rcache) : "r"(DEVTBLADDR) : "memory");
 		c_info_rcache *= sizeof(unsigned long);
 		c_info_rcache /= 1024;
 		#endif
@@ -363,7 +363,7 @@ __attribute__((noreturn)) void __init pu32_start (char **argv, char **envp) {
 	// the lower the physical memory, the higher the virtual memory.
 	pu32_mem_end = ((pu32_mem_end_high > (TASK_SIZE/3)) ? (TASK_SIZE/3) : pu32_mem_end_high);
 	pu32_TASK_UNMAPPED_BASE = ROUNDUPTOPOWEROFTWO(pu32_mem_end, PGDIR_SIZE); // RoundUp as it is used as FIRST_USER_ADDRESS value.
-	asm volatile ("setksl %0\n" :: "r"(pu32_TASK_UNMAPPED_BASE));
+	asm volatile ("setksl %0\n" :: "r"(pu32_TASK_UNMAPPED_BASE) : "memory");
 
 	char *p = argv[1]; if (p) {
 		strlcpy(boot_command_line, p, COMMAND_LINE_SIZE);

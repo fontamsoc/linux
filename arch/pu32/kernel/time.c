@@ -46,13 +46,13 @@ void pu32_timer_intr (void) {
 static int pu32_timer_set_next_event (
 	unsigned long delta,
 	struct clock_event_device *dev) {
-	asm volatile ("settimer %0" :: "r"(delta));
+	asm volatile ("settimer %0\n" :: "r"(delta) : "memory");
 	return 0;
 }
 
 static int pu32_timer_set_state_shutdown (
 	struct clock_event_device *evt) {
-	asm volatile ("settimer %0" :: "r"(-1));
+	asm volatile ("settimer %0\n" :: "r"(-1) : "memory");
 	return 0;
 }
 

@@ -10,7 +10,7 @@
 void __delay(unsigned long loops) {
 	cycles_t i = get_cycles();
 	while ((get_cycles() - i) < loops)
-		asm volatile("preemptctx");
+		asm volatile("preemptctx\n" ::: "memory");
 }
 EXPORT_SYMBOL(__delay);
 

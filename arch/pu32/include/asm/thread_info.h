@@ -18,16 +18,16 @@
 #include <asm/mmu.h>
 
 struct thread_info {
-	struct task_struct	*task;
-	unsigned long		flags;
-	unsigned int		cpu;
-	unsigned int		last_cpu;
-	int			preempt_count;
-	unsigned long		in_fault; // Tell whether the thread is executing do_fault().
-	pu32FaultReason	faultreason; // Used to save pu32FaultReason when in_fault is non-null.
-	unsigned long		ksp, kr1, kpc;
-	unsigned long		pu32flags; // flags to use in userspace.
-	struct pt_regs		*irq_regs;
+	struct task_struct *task;
+	unsigned long      flags;
+	unsigned int       cpu;
+	unsigned int       last_cpu;
+	int                preempt_count;
+	unsigned long      in_fault; // Tell whether the thread is executing do_fault().
+	pu32FaultReason    faultreason; // Used to save pu32FaultReason when in_fault is non-null.
+	unsigned long      ksp, kr1, kpc;
+	unsigned long      pu32flags; // flags to use in userspace.
+	struct pt_regs     *irq_regs;
 };
 
 #define __HAVE_THREAD_FUNCTIONS
@@ -39,10 +39,9 @@ struct thread_info {
 #define end_of_stack(tsk)		((long unsigned *)pu32_stack_bottom(task_stack_page(tsk)))
 #define pu32_get_thread_info(sp)	((struct thread_info *)(pu32_stack_top(sp) + PU32_TI_OFFSET))
 #define task_thread_info(tsk)		pu32_get_thread_info(task_stack_page(tsk))
-static inline unsigned long pu32_in_userspace (struct thread_info *ti) {
-	// To be used before save_pu32umode_regs() or after restore_pu32umode_regs().
-	return (ti->ksp == pu32_stack_bottom(ti->ksp));
-}
+#define pu32_in_userspace(ti) ({ \
+	/* To be used before save_pu32umode_regs() or after restore_pu32umode_regs() */ \
+	(ti->ksp == pu32_stack_bottom(ti->ksp)); })
 #define pu32_ret_to_userspace(ti) \
 	/* To be used after save_pu32umode_regs() or before restore_pu32umode_regs().
 	   This function must be used instead of (!pu32_ret_to_kernelspace()),
@@ -84,7 +83,7 @@ static inline unsigned long pu32_in_userspace (struct thread_info *ti) {
 // Must match CURRENT_THREAD_INFO.
 #define current_thread_info() ({ \
 	struct thread_info *ti; \
-	asm volatile ("cpy %0, %%tp\n" : "=r"(ti)); \
+	asm volatile ("cpy %0, %%tp\n" : "=r"(ti) :: "memory"); \
 	ti; })
 
 #endif /* !__ASSEMBLY__ */
