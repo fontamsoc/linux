@@ -42,9 +42,10 @@ void __init setup_smp (void) {
 	while (1) {
 		unsigned int old_cpu_up_arg = cpu_up_arg;
 		BUG_ON(_inc_cpu_up_arg_raddr>>16); // Insure address fit in 16bits.
-		asm volatile ("ldst16 %0, %1" /* does memory fencing as well */
-			: "+r" ((unsigned long){_inc_cpu_up_arg_raddr})
-			: "r"  (PARKPU_RLI16IMM_ADDR));
+		asm volatile ("ldst16 %0, %1\n" ::
+			"r" ((unsigned long){_inc_cpu_up_arg_raddr}),
+			"r"  (PARKPU_RLI16IMM_ADDR) :
+			"memory");
 		unsigned long irqdst;
 		if (pu32_ishw) {
 			hwdrvintctrl_ack(old_cpu_up_arg, 0);
@@ -102,9 +103,10 @@ int __cpu_up (unsigned int cpu, struct task_struct *tidle) {
 	extern char _start_smp[];
 	unsigned long _start_smp_raddr = ((unsigned long)_start_smp - (PARKPU_RLI16IMM_ADDR + 2));
 	BUG_ON(_start_smp_raddr>>16); // Insure address fit in 16bits.
-	asm volatile ("ldst16 %0, %1" /* does memory fencing as well */
-		: "+r" ((unsigned long){_start_smp_raddr})
-		: "r"  (PARKPU_RLI16IMM_ADDR));
+	asm volatile ("ldst16 %0, %1\n" ::
+		"r"((unsigned long){_start_smp_raddr}),
+		"r"(PARKPU_RLI16IMM_ADDR) :
+		"memory");
 
 	int ret = 0;
 	unsigned long irqdst;
@@ -157,12 +159,12 @@ void c_setup (void);
 void pu32_start_smp (void) {
 
 	if (pu32_ishw)
-		asm volatile ("setksysopfaulthdlr %0\n" :: "r"(pu32_ishw));
+		asm volatile ("setksysopfaulthdlr %0\n" :: "r"(pu32_ishw) : "memory");
 
-	asm volatile ("setksl %0\n" :: "r"(pu32_TASK_UNMAPPED_BASE));
+	asm volatile ("setksl %0\n" :: "r"(pu32_TASK_UNMAPPED_BASE) : "memory");
 
 	struct thread_info *ti = pu32_get_thread_info(cpu_up_arg);
-	asm volatile ("cpy %%tp, %0" :: "r"(ti));
+	asm volatile ("cpy %%tp, %0\n" :: "r"(ti) : "memory");
 
 	struct mm_struct *mm = &init_mm;
 	mmget(mm);
@@ -216,7 +218,7 @@ static irqreturn_t handle_ipi (int irq, void *dev) {
 				hwdrvintctrl_ack(raw_smp_processor_id(), 0);
 			set_cpu_online(raw_smp_processor_id(), false);
 			kfree((void *)pu32_kernelmode_stack[raw_smp_processor_id()]);
-			asm volatile ("j %0" :: "r"(PARKPU_ADDR));
+			asm volatile ("j %0\n" :: "r"(PARKPU_ADDR) : "memory");
 			// It should never reach here.
 			BUG();
 		}

@@ -19,7 +19,7 @@ void update_mmu_cache (struct vm_area_struct *vma, unsigned long addr, pte_t *pt
 
 	unsigned long pte_val_pte = pte_val(pte);
 	asm volatile (
-		"settlb %0, %1"
+		"settlb %0, %1\n"
 		:: "r"(pte_val_pte & ~(/* Modify only either the itlb or dtlb */
 			(pte_val_pte&_PAGE_EXECUTABLE) ?
 				(_PAGE_READABLE | _PAGE_WRITABLE) :

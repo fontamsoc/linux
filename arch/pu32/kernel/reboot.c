@@ -12,7 +12,7 @@ void machine_restart (char *cmd) {
 	smp_send_stop();
 	#endif
 	do_kernel_restart(cmd);
-	asm volatile ("li8 %%1, 1; li %%sr, %0; syscall\n" :: "i"(__NR_exit));
+	asm volatile ("li8 %%1, 1; li %%sr, %0; syscall\n" :: "i"(__NR_exit) : "memory");
 	pr_emerg("machine_restart() failed -- halting system\n");
 	while(1);
 }
@@ -23,7 +23,7 @@ void machine_power_off (void) {
 	smp_send_stop();
 	#endif
 	do_kernel_power_off();
-	asm volatile ("li8 %%1, 0; li %%sr, %0; syscall\n" :: "i"(__NR_exit));
+	asm volatile ("li8 %%1, 0; li %%sr, %0; syscall\n" :: "i"(__NR_exit) : "memory");
 	pr_emerg("machine_power_off() failed -- halting system\n");
 	while(1);
 }

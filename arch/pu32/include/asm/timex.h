@@ -9,13 +9,13 @@ typedef u64 cycles_t;
 static inline cycles_t get_cycles (void) {
 	inline unsigned long get_cycles_hi (void) {
 		unsigned long hi;
-		asm volatile ("getclkcyclecnth %0\n" : "=r"(hi));
+		asm volatile ("getclkcyclecnth %0\n" : "=r"(hi) :: "memory");
 		return hi;
 	}
 	unsigned long lo, hi;
 	do {
 		hi = get_cycles_hi();
-		asm volatile ("getclkcyclecnt %0\n"  : "=r"(lo));
+		asm volatile ("getclkcyclecnt %0\n"  : "=r"(lo) :: "memory");
 	} while (hi != get_cycles_hi());
 	return (((u64)hi << 32) | lo);
 }

@@ -13,25 +13,25 @@ unsigned long c_info_rcache; // In KB. Set by pu32_start().
 void c_setup (void) { // Best called before setting cpu online.
 
 	unsigned long ver;
-	asm volatile ("getver %0\n" : "=r"(ver));
+	asm volatile ("getver %0\n" : "=r"(ver) :: "memory");
 
 	unsigned long cap;
-	asm volatile ("getcap %0\n" : "=r"(cap));
+	asm volatile ("getcap %0\n" : "=r"(cap) :: "memory");
 
 	unsigned long freq;
-	asm volatile ("getclkfreq %0\n" : "=r"(freq));
+	asm volatile ("getclkfreq %0\n" : "=r"(freq) :: "memory");
 
 	unsigned long icache;
-	asm volatile ("geticachesize %0\n" : "=r"(icache));
+	asm volatile ("geticachesize %0\n" : "=r"(icache) :: "memory");
 
 	unsigned long dcache;
-	asm volatile ("getdcachesize %0\n" : "=r"(dcache));
+	asm volatile ("getdcachesize %0\n" : "=r"(dcache) :: "memory");
 
 	unsigned long tlbsz;
-	asm volatile ("gettlbsize %0" : "=r"(tlbsz));
+	asm volatile ("gettlbsize %0\n" : "=r"(tlbsz) :: "memory");
 
 	unsigned long coreid;
-	asm volatile ("getcoreid %0\n" : "=r"(coreid));
+	asm volatile ("getcoreid %0\n" : "=r"(coreid) :: "memory");
 
 	c_info[coreid].version_major = ((ver & 0xff00) >> 8);
 	c_info[coreid].version_minor = (ver & 0xff);

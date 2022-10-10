@@ -37,29 +37,29 @@
 
 static inline unsigned long pu32_tlb_size (void) {
 	unsigned long sz;
-	asm volatile ("gettlbsize %0" : "=r"(sz));
+	asm volatile ("gettlbsize %0\n" : "=r"(sz) :: "memory");
 	return sz;
 }
 
 static inline unsigned long pu32_tlb_lookup (unsigned long addr) {
 	unsigned long d = ((addr & PAGE_MASK) | current->active_mm->context);
-	asm volatile ("gettlb %0, %0" : "+r"(d));
+	asm volatile ("gettlb %0, %0\n" : "+r"(d) :: "memory");
 	return d;
 }
 
 static inline void pu32_tlb_update (struct pu32tlbentry tlbentry) {
-	asm volatile ("settlb %0, %1" :: "r"(tlbentry.d1), "r"(tlbentry.d2) : "memory");
+	asm volatile ("settlb %0, %1\n" :: "r"(tlbentry.d1), "r"(tlbentry.d2) : "memory");
 }
 
 static inline void local_flush_tlb_page (
 	struct vm_area_struct *vma, unsigned long addr) {
 	unsigned long d = ((addr & PAGE_MASK) | current->active_mm->context);
-	asm volatile ("clrtlb %0, %1" :: "r"(-1), "r"(d) : "memory");
+	asm volatile ("clrtlb %0, %1\n" :: "r"(-1), "r"(d) : "memory");
 }
 
 static inline void local_flush_tlb_all (void) {
 	unsigned long sz = (pu32_tlb_size() << PAGE_SHIFT);
-	do asm volatile ("clrtlb %0, %1" :: "r"(0), "r"(sz -= PAGE_SIZE) : "memory");
+	do asm volatile ("clrtlb %0, %1\n" :: "r"(0), "r"(sz -= PAGE_SIZE) : "memory");
 		while (sz);
 }
 
@@ -69,7 +69,7 @@ static inline void local_flush_tlb_range (
 	unsigned long end) {
 	for (; start < end; start += PAGE_SIZE) {
 		unsigned long d = ((start & PAGE_MASK) | current->active_mm->context);
-		asm volatile ("clrtlb %0, %1" :: "r"(-1), "r"(d) : "memory");
+		asm volatile ("clrtlb %0, %1\n" :: "r"(-1), "r"(d) : "memory");
 	}
 }
 
@@ -81,7 +81,7 @@ static inline void local_flush_tlb_mm (struct mm_struct *mm) {
 		unsigned long end = vma->vm_end;
 		for (; start < end; start += PAGE_SIZE) {
 			unsigned long d = ((start & PAGE_MASK) | context);
-			asm volatile ("clrtlb %0, %1" :: "r"(-1), "r"(d) : "memory");
+			asm volatile ("clrtlb %0, %1\n" :: "r"(-1), "r"(d) : "memory");
 		}
 	}
 }

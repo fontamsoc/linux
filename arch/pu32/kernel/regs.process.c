@@ -9,7 +9,7 @@ void save_pu32umode_regs (
 	unsigned long sysopcode) {
 
 	unsigned long sp;
-	asm volatile ("setkgpr %0, %%sp" : "=r"(sp));
+	asm volatile ("setkgpr %0, %%sp\n" : "=r"(sp) :: "memory");
 
 	unsigned long ksp = (pu32_in_userspace(ti) ? ti->ksp : sp);
 
@@ -50,7 +50,10 @@ void save_pu32umode_regs (
 				"inc8 %0, 4\n"
 				"st32 %%sr, %0\n"
 
-				:: "r"(&ppr->regs), "r"(sp));
+				::
+				"r"(&ppr->regs), "r"(sp)
+				:
+				"memory");
 
 			return;
 
@@ -124,7 +127,10 @@ void save_pu32umode_regs (
 				"inc8 %0, 4\n"
 				"st32 %%sr, %0\n"
 
-				:: "r"(&ppr->regs), "r"(sp));
+				::
+				"r"(&ppr->regs), "r"(sp)
+				:
+				"memory");
 
 			return;
 
@@ -166,7 +172,10 @@ void restore_pu32umode_regs (struct thread_info *ti) {
 				"ld32 %%sr, %0\n"
 				"setugpr %%15, %%sr\n"
 
-				:: "r"(&ppr->regs));
+				::
+				"r"(&ppr->regs)
+				:
+				"memory");
 
 			return;
 
@@ -241,7 +250,10 @@ void restore_pu32umode_regs (struct thread_info *ti) {
 				//"ld32 %%sr, %0\n"
 				//"setuip %%sr\n"
 
-				:: "r"(&ppr->regs));
+				::
+				"r"(&ppr->regs)
+				:
+				"memory");
 
 			return;
 

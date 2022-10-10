@@ -9,10 +9,11 @@
 #endif
 
 #define raw_smp_processor_id() ({	\
-	unsigned long n;		\
+	int n;				\
 	asm volatile (			\
-		"getcoreid %0"		\
-		:  "=r"(n));		\
+		"getcoreid %0" :	\
+		"=r"(n) ::		\
+		"memory");		\
 	n; })
 
 struct cpumask;

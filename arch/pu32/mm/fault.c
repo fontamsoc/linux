@@ -225,7 +225,7 @@ vmalloc_fault:;
 	set_pmd(pmd, *pmd_k);
 
 	asm volatile (
-		"settlb %0, %1"
+		"settlb %0, %1\n"
 		:: "r"(pte_val(pte_k) & ~(/* Modify only either the itlb or dtlb */
 			(faultreason == pu32ExecFaultIntr) ?
 				(_PAGE_READABLE | _PAGE_WRITABLE) :

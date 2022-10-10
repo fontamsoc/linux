@@ -742,7 +742,7 @@ struct pu32tlbentry {
 
 static inline unsigned long pu32clkfreq (void) {
 	cycles_t n;
-	asm volatile ("getclkfreq %0" : "=r" (n));
+	asm volatile ("getclkfreq %0\n" : "=r" (n) :: "memory");
 	return n;
 }
 
@@ -754,10 +754,10 @@ static inline ssize_t pu32sysread (int fd, void *buf, size_t count) {
 
 	asm volatile (
 		"li %%sr, %1\n"
-		"syscall\n"
-		: "=r"(a1) // Output constraints.
-		: "i"(__NR_read), "r"(a1), "r"(a2), "r"(a3) // Input constraints.
-	);
+		"syscall\n" :
+		"=r"(a1) /* Output constraints */ :
+		"i"(__NR_read), "r"(a1), "r"(a2), "r"(a3) /* Input constraints */ :
+		"memory");
 
 	return ((a1 != -1) ? a1 : 0);
 }
@@ -770,10 +770,10 @@ static inline ssize_t pu32syswrite (int fd, void *buf, size_t count) {
 
 	asm volatile (
 		"li %%sr, %1\n"
-		"syscall\n"
-		: "=r"(a1) // Output constraints.
-		: "i"(__NR_write), "r"(a1), "r"(a2), "r"(a3) // Input constraints.
-	);
+		"syscall\n" :
+		"=r"(a1) /* Output constraints */ :
+		"i"(__NR_write), "r"(a1), "r"(a2), "r"(a3) /* Input constraints */ :
+		"memory");
 
 	return ((a1 != -1) ? a1 : 0);
 }
@@ -788,10 +788,10 @@ static inline off_t pu32syslseek (int fd, off_t offset, int whence) {
 
 	asm volatile (
 		"li %%sr, %1\n"
-		"syscall\n"
-		: "=r"(a1) // Output constraints.
-		: "i"(__NR_lseek), "r"(a1), "r"(a2), "r"(a3) // Input constraints.
-	);
+		"syscall\n" :
+		"=r"(a1) /* Output constraints */ :
+		"i"(__NR_lseek), "r"(a1), "r"(a2), "r"(a3) /* Input constraints */ :
+		"memory");
 
 	return ((a1 != -1) ? a1 : 0);
 }

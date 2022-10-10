@@ -36,9 +36,10 @@ static inline void switch_mm (struct mm_struct *prev, struct mm_struct *next, st
 	done:
 	asm volatile (
 		"cpy %%sr, %1\n"
-		"setasid %0\n"
-		:: "r"(context),
-		   "r"(next->pgd));
+		"setasid %0\n" ::
+		"r"(context),
+		"r"(next->pgd) :
+		"memory");
 }
 
 static inline void activate_mm (struct mm_struct *prev, struct mm_struct *next) {
