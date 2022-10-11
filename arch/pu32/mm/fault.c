@@ -139,6 +139,12 @@ good_area:;
 		BUG();
 	}
 
+	// The fault is fully completed (including releasing mmap lock).
+	if (fault & VM_FAULT_COMPLETED) {
+		ret = 1;
+		goto done;
+	}
+
 	if (fault & VM_FAULT_RETRY) {
 		flags |= FAULT_FLAG_TRIED;
 		/* No need to mmap_read_unlock(mm) as we would
