@@ -14,11 +14,11 @@ static void pu32sysret (unsigned long _do) {
 		#endif
 		#endif
 		#ifdef CONFIG_CONTEXT_TRACKING
-		void context_tracking_user_enter(void);
-		void context_tracking_user_exit(void);
+		void user_enter_callable(void);
+		void user_exit_callable(void);
 		unsigned long ti_in_userspace;
 		if ((ti_in_userspace = pu32_in_userspace(current_thread_info())))
-			context_tracking_user_enter();
+			user_enter_callable();
 		#endif
 		asm volatile ("sysret\n" ::: "memory");
 		asm volatile (
@@ -27,7 +27,7 @@ static void pu32sysret (unsigned long _do) {
 			"memory");
 		#ifdef CONFIG_CONTEXT_TRACKING
 		if (ti_in_userspace)
-			context_tracking_user_exit();
+			user_exit_callable();
 		#endif
 		pu32sysrethdlr();
 	}
