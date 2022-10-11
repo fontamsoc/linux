@@ -146,10 +146,6 @@ int __cpu_up (unsigned int cpu, struct task_struct *tidle) {
 
 void __init smp_cpus_done (unsigned int max_cpus) {}
 
-int setup_profiling_timer (unsigned int multiplier) {
-	return -EINVAL;
-}
-
 extern unsigned long pu32_TASK_UNMAPPED_BASE;
 
 void pu32ctxswitchhdlr (void);
