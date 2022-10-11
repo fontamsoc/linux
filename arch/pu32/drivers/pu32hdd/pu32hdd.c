@@ -276,7 +276,7 @@ static void __exit pu32hdd_exit (void) {
 		pu32hdd_irq_free();
 	int major_num = pu32hdd_dev.gd->major;
 	del_gendisk(pu32hdd_dev.gd);
-	blk_cleanup_disk(pu32hdd_dev.gd);
+	put_disk(pu32hdd_dev.gd);
 	unregister_blkdev (major_num, "hd");
 }
 
