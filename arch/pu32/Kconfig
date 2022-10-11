@@ -106,9 +106,6 @@ config LOCKDEP_SUPPORT
 config HW_RANDOM
 	default n
 
-config ARCH_RANDOM
-	def_bool y
-
 config RANDOM_TRUST_CPU
 	def_bool y
 
