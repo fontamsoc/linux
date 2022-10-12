@@ -26,7 +26,6 @@ struct thread_info {
 	unsigned long      in_fault; // Tell whether the thread is executing do_fault().
 	pu32FaultReason    faultreason; // Used to save pu32FaultReason when in_fault is non-null.
 	unsigned long      ksp, kr1, kpc;
-	unsigned long      pu32flags; // flags to use in userspace.
 	struct pt_regs     *irq_regs;
 };
 
@@ -48,7 +47,7 @@ struct thread_info {
 	   because it also checks whether the task is a kernel-thread. */ \
 	(!((ti)->task->flags&(PF_KTHREAD | PF_IO_WORKER)) && \
 		((ti)->ksp == (unsigned long)((struct pu32_pt_regs *)pu32_stack_bottom((ti)->ksp)-1)))
-// setup_thread_stack() does not set ti->pu32flags, ti->ksp (if kernel-thread),
+// setup_thread_stack() does not set ti->ksp (if kernel-thread),
 // ti->kr1, ti->kpc, as they are set by copy_thread().
 #define setup_thread_stack(tsk, orig)  {					\
 	struct thread_info *tsk_ti = task_thread_info(tsk);			\
@@ -77,7 +76,6 @@ struct thread_info {
 	.last_cpu	= 0,				\
 	.preempt_count	= INIT_PREEMPT_COUNT,		\
 	.in_fault	= 0,				\
-	.pu32flags	= PU32_FLAGS_KERNELSPACE,	\
 }
 
 // Must match CURRENT_THREAD_INFO.

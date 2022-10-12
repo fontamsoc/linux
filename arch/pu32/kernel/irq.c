@@ -9,6 +9,7 @@
 #include <pu32.h>
 
 unsigned long pu32irqflags[NR_CPUS];
+unsigned long pu32hwflags[NR_CPUS];
 
 // Read interrupt enabled status.
 unsigned long arch_local_save_flags (void) {
@@ -17,23 +18,25 @@ unsigned long arch_local_save_flags (void) {
 EXPORT_SYMBOL(arch_local_save_flags);
 
 // Set interrupt enabled status.
-void arch_local_irq_restore (unsigned long flags) {
-	unsigned long pu32flags = current_thread_info()->pu32flags;
-	if (flags == ARCH_IRQ_DISABLED) {
-		pu32flags |= PU32_FLAGS_disIntr;
-		__asm__ __volatile__ ("setflags %0\n" :: "r"(pu32flags) : "memory");
-		current_thread_info()->pu32flags = pu32flags;
-		__asm__ __volatile__("" ::: "memory");
-		pu32irqflags[raw_smp_processor_id()] = flags;
-		__asm__ __volatile__("" ::: "memory");
-	} else {
-		pu32flags &= ~PU32_FLAGS_disIntr;
-		current_thread_info()->pu32flags = pu32flags;
-		__asm__ __volatile__("" ::: "memory");
-		pu32irqflags[raw_smp_processor_id()] = flags;
-		__asm__ __volatile__("" ::: "memory");
-		__asm__ __volatile__ ("setflags %0\n" :: "r"(pu32flags) : "memory");
-	}
+void arch_local_irq_restore (unsigned long irqflags) {
+	// Regardless of irqflags value to set, always
+	// disable IRQs first to avoid unwanted preemption.
+	__asm__ __volatile__ (
+		"setflags %0\n" ::
+		"r"(pu32hwflags[raw_smp_processor_id()] | PU32_FLAGS_disIntr) :
+		"memory");
+
+	pu32irqflags[raw_smp_processor_id()] = irqflags;
+
+	if (irqflags == ARCH_IRQ_DISABLED)
+		pu32hwflags[raw_smp_processor_id()] |= PU32_FLAGS_disIntr;
+	else
+		pu32hwflags[raw_smp_processor_id()] &= ~PU32_FLAGS_disIntr;
+
+	__asm__ __volatile__ (
+		"setflags %0\n" ::
+		"r"(pu32hwflags[raw_smp_processor_id()]) :
+		"memory");
 }
 EXPORT_SYMBOL(arch_local_irq_restore);
 

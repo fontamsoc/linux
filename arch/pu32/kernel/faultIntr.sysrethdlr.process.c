@@ -80,8 +80,10 @@ static void pu32sysrethdlr_faultIntr (pu32FaultReason faultreason, unsigned long
 
 	save_pu32umode_regs(ti, PU32_PT_REGS_WHICH_ALL, faultreason, sysopcode);
 
-	ti->pu32flags &= ~PU32_FLAGS_USERSPACE;
-	ti->pu32flags |= PU32_FLAGS_KERNELSPACE;
+	unsigned long hwflags = pu32hwflags[raw_smp_processor_id()];
+	hwflags &= ~PU32_FLAGS_USERSPACE;
+	hwflags |= PU32_FLAGS_KERNELSPACE;
+	pu32hwflags[raw_smp_processor_id()] = hwflags;
 
 	asm volatile ("setugpr %%tp, %0\n" :: "r"(ti) : "memory");
 	asm volatile ("setugpr %%sp, %0\n" :: "r"(ti->ksp) : "memory");
@@ -97,5 +99,5 @@ static void pu32sysrethdlr_faultIntr (pu32FaultReason faultreason, unsigned long
 		"r"(mm->context),
 		"r"(mm->pgd) :
 		"memory");
-	asm volatile ("setflags %0\n" :: "r"(ti->pu32flags) : "memory");
+	asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
 }

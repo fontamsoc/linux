@@ -8,9 +8,8 @@ static void pu32sysrethdlr_timerIntr (unsigned long sysopcode) {
 
 	#if defined(CONFIG_PU32_DEBUG)
 	if (pu32irqflags[raw_smp_processor_id()] == ARCH_IRQ_DISABLED) {
-		pu32hang ("pu32TimerIntr: unexpected interrupt !!! current_thread_info(0x%x)->pu32flags(0x%x) ti(0x%x)->pu32flags(0x%x)\n",
-			current_thread_info(), current_thread_info()->pu32flags,
-			ti, ti->pu32flags);
+		pu32hang ("pu32TimerIntr: unexpected interrupt !!! hwflags(0x%x)\n",
+			pu32hwflags[raw_smp_processor_id()]);
 		return;
 		// pu32hang() will infinite-loop;
 		// so `return` will not be executed, but
@@ -28,8 +27,10 @@ static void pu32sysrethdlr_timerIntr (unsigned long sysopcode) {
 
 		save_pu32umode_regs(ti, PU32_PT_REGS_WHICH_ALL, pu32TimerIntr, sysopcode);
 
-		ti->pu32flags &= ~PU32_FLAGS_USERSPACE;
-		ti->pu32flags |= PU32_FLAGS_KERNELSPACE;
+		unsigned long hwflags = pu32hwflags[raw_smp_processor_id()];
+		hwflags &= ~PU32_FLAGS_USERSPACE;
+		hwflags |= PU32_FLAGS_KERNELSPACE;
+		pu32hwflags[raw_smp_processor_id()] = hwflags;
 		raw_local_irq_disable();
 
 		asm volatile ("setugpr %%tp, %0\n" :: "r"(ti) : "memory");
@@ -44,6 +45,6 @@ static void pu32sysrethdlr_timerIntr (unsigned long sysopcode) {
 			"r"(mm->context),
 			"r"(mm->pgd) :
 			"memory");
-		asm volatile ("setflags %0\n" :: "r"(ti->pu32flags) : "memory");
+		asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
 	}
 }

@@ -42,8 +42,10 @@ static void pu32sysrethdlr_extIntr (unsigned long sysopcode) {
 
 		save_pu32umode_regs(ti, PU32_PT_REGS_WHICH_ALL, pu32ExtIntr, sysopcode);
 
-		ti->pu32flags &= ~PU32_FLAGS_USERSPACE;
-		ti->pu32flags |= PU32_FLAGS_KERNELSPACE;
+		unsigned long hwflags = pu32hwflags[raw_smp_processor_id()];
+		hwflags &= ~PU32_FLAGS_USERSPACE;
+		hwflags |= PU32_FLAGS_KERNELSPACE;
+		pu32hwflags[raw_smp_processor_id()] = hwflags;
 		raw_local_irq_disable();
 
 		asm volatile ("setugpr %%tp, %0\n" :: "r"(ti) : "memory");
@@ -58,6 +60,6 @@ static void pu32sysrethdlr_extIntr (unsigned long sysopcode) {
 			"r"(mm->context),
 			"r"(mm->pgd) :
 			"memory");
-		asm volatile ("setflags %0\n" :: "r"(ti->pu32flags) : "memory");
+		asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
 	}
 }

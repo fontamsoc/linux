@@ -51,8 +51,10 @@ static void pu32sysrethdlr_sysOpIntr (
 
 				save_pu32umode_regs(ti, PU32_PT_REGS_WHICH_ALL, pu32SysOpIntr, sysopcode);
 
-				ti->pu32flags &= ~PU32_FLAGS_USERSPACE;
-				ti->pu32flags |= PU32_FLAGS_KERNELSPACE;
+				unsigned long hwflags = pu32hwflags[raw_smp_processor_id()];
+				hwflags &= ~PU32_FLAGS_USERSPACE;
+				hwflags |= PU32_FLAGS_KERNELSPACE;
+				pu32hwflags[raw_smp_processor_id()] = hwflags;
 
 				asm volatile ("setugpr %%tp, %0\n" :: "r"(ti) : "memory");
 				asm volatile ("setugpr %%sp, %0\n" :: "r"(ti->ksp) : "memory");
@@ -65,7 +67,7 @@ static void pu32sysrethdlr_sysOpIntr (
 					"r"(mm->context),
 					"r"(mm->pgd) :
 					"memory");
-				asm volatile ("setflags %0\n" :: "r"(ti->pu32flags) : "memory");
+				asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
 
 				return;
 
@@ -137,18 +139,20 @@ static void pu32sysrethdlr_sysOpIntr (
 					struct mm_struct *next_mm = next->active_mm;
 					unsigned long asid = (next_mm->context|(next_ti_in_userspace<<12));
 
+					unsigned long hwflags = pu32hwflags[raw_smp_processor_id()];
 					if (prev || !next_ti_in_userspace) {
-						next_ti->pu32flags &= ~PU32_FLAGS_USERSPACE;
-						next_ti->pu32flags |= PU32_FLAGS_KERNELSPACE;
+						hwflags &= ~PU32_FLAGS_USERSPACE;
+						hwflags |= PU32_FLAGS_KERNELSPACE;
 						if (next_ti->preempt_count == PREEMPT_ENABLED)
 							raw_local_irq_enable();
 						else
 							raw_local_irq_disable();
 					} else {
-						next_ti->pu32flags &= ~PU32_FLAGS_KERNELSPACE;
-						next_ti->pu32flags |= PU32_FLAGS_USERSPACE;
+						hwflags &= ~PU32_FLAGS_KERNELSPACE;
+						hwflags |= PU32_FLAGS_USERSPACE;
 						raw_local_irq_enable();
 					}
+					pu32hwflags[raw_smp_processor_id()] = hwflags;
 
 					#ifdef CONFIG_SMP
 					if (next_ti->last_cpu != raw_smp_processor_id()) {
@@ -163,7 +167,7 @@ static void pu32sysrethdlr_sysOpIntr (
 						"setflags %1\n"
 						"setugpr %%1, %2\n"
 						"setuip %3\n" ::
-						"r"(asid), "r"(next_ti->pu32flags),
+						"r"(asid), "r"(hwflags),
 						"r"((unsigned long)prev ?: next_r1),
 						"r"((prev ? prev_pc : next_pc) +
 							((next_faultreason == pu32SysOpIntr) ?
@@ -254,8 +258,10 @@ static void pu32sysrethdlr_sysOpIntr (
 
 			save_pu32umode_regs(ti, PU32_PT_REGS_WHICH_ALL, pu32SysOpIntr, sysopcode);
 
-			ti->pu32flags &= ~PU32_FLAGS_USERSPACE;
-			ti->pu32flags |= PU32_FLAGS_KERNELSPACE;
+			unsigned long hwflags = pu32hwflags[raw_smp_processor_id()];
+			hwflags &= ~PU32_FLAGS_USERSPACE;
+			hwflags |= PU32_FLAGS_KERNELSPACE;
+			pu32hwflags[raw_smp_processor_id()] = hwflags;
 
 			asm volatile ("setugpr %%tp, %0\n" :: "r"(ti) : "memory");
 			asm volatile ("setugpr %%sp, %0\n" :: "r"(ti->ksp) : "memory");
@@ -271,7 +277,7 @@ static void pu32sysrethdlr_sysOpIntr (
 				"r"(mm->context),
 				"r"(mm->pgd) :
 				"memory");
-			asm volatile ("setflags %0\n" :: "r"(ti->pu32flags) : "memory");
+			asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
 
 			return;
 		}

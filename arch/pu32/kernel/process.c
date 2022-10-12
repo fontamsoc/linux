@@ -110,8 +110,6 @@ int copy_thread (struct task_struct *p, const struct kernel_clone_args *args) {
 		pti->kr1 = (unsigned long)args->fn_arg;
 		pti->kpc = (unsigned long)args->fn;
 
-		pti->pu32flags = PU32_FLAGS_KERNELSPACE;
-
 	} else {
 		// User-thread.
 
@@ -137,8 +135,6 @@ int copy_thread (struct task_struct *p, const struct kernel_clone_args *args) {
 		// ppr->regs.pc will not be used by __NR_PU32_switch_to.
 
 		pti->ksp = (unsigned long)ppr;
-
-		pti->pu32flags = PU32_FLAGS_USERSPACE;
 	}
 
 	return 0;
@@ -176,6 +172,7 @@ void pu32_timer_intr (void);
 extern unsigned long loops_per_jiffy;
 
 extern unsigned long pu32irqflags[NR_CPUS];
+extern unsigned long pu32hwflags[NR_CPUS];
 
 // Get set to the start of the pu32-kernelmode stack.
 unsigned long pu32_kernelmode_stack[NR_CPUS];
@@ -208,8 +205,10 @@ void pu32ctxswitchhdlr (void) {
 
 	pu32_cpu_curr[raw_smp_processor_id()] = tsk;
 
-	ti->pu32flags &= ~PU32_FLAGS_USERSPACE;
-	ti->pu32flags |= PU32_FLAGS_KERNELSPACE;
+	unsigned long hwflags = pu32hwflags[raw_smp_processor_id()];
+	hwflags &= ~PU32_FLAGS_USERSPACE;
+	hwflags |= PU32_FLAGS_KERNELSPACE;
+	pu32hwflags[raw_smp_processor_id()] = hwflags;
 
 	struct mm_struct *mm = tsk->active_mm;
 	asm volatile (
@@ -222,7 +221,7 @@ void pu32ctxswitchhdlr (void) {
 		"setuip %3\n" ::
 		"r"(mm->context),
 		"r"(mm->pgd),
-		"r"(ti->pu32flags),
+		"r"(hwflags),
 		"r"(pu32sysret) :
 		"memory");
 
