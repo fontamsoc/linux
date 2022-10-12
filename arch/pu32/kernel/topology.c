@@ -20,7 +20,9 @@ static int __init topology_init (void) {
 
 	for_each_present_cpu(i) {
 		struct cpu *cpu = &cpu_devices[i];
+		#ifdef CONFIG_HOTPLUG_CPU
 		cpu->hotpluggable = 1;
+		#endif
 		if ((err = register_cpu(cpu, i))) {
 			pr_warn ("%s: register_cpu(%d) == %d\n",
 				__FUNCTION__, i, err);

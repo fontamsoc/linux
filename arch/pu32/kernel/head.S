@@ -61,12 +61,12 @@ ENTRY(_inc_cpu_up_arg)
 	# Restore default value at PARKPU_RLI16IMM_ADDR.
 	li %sr, PARKPU_RLI16IMM_ADDR
 	li %1, -10
-	st16 %1, %sr
+	st16v %1, %sr
 
 	rli %sr, cpu_up_arg
-	ld32 %1, %sr
+	ld32v %1, %sr
 	inc8 %1, 1
-	ldst32 %1, %sr
+	st32v %1, %sr
 
 	li %sr, PARKPU_ADDR
 	j %sr
@@ -77,10 +77,10 @@ ENTRY(_start_smp)
 	# Restore default value at PARKPU_RLI16IMM_ADDR.
 	li %sr, PARKPU_RLI16IMM_ADDR
 	li %1, -10
-	st16 %1, %sr
+	st16v %1, %sr
 
 	rli %sr, cpu_up_arg
-	ld32 %sp, %sr
+	ld32v %sp, %sr
 
 	li %fp, 0
 

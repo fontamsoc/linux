@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // (c) William Fonkou Tambe
 
-//#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
-//#include <linux/kernel_stat.h>
 #include <linux/notifier.h>
 #include <linux/cpu.h>
 #include <linux/interrupt.h>
@@ -14,15 +12,14 @@
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/irq.h>
+#include <linux/irq_work.h>
+#include <linux/seq_file.h>
 #include <linux/sched/task_stack.h>
 #include <linux/sched/mm.h>
 #include <linux/sched/hotplug.h>
 
 #include <asm/irq.h>
-//#include <asm/traps.h>
 #include <asm/sections.h>
-//#include <asm/mmu_context.h>
-//#include <asm/pgalloc.h>
 
 #include <hwdrvintctrl.h>
 
@@ -42,10 +39,7 @@ void __init setup_smp (void) {
 	while (1) {
 		unsigned int old_cpu_up_arg = cpu_up_arg;
 		BUG_ON(_inc_cpu_up_arg_raddr>>16); // Insure address fit in 16bits.
-		asm volatile ("ldst16 %0, %1\n" ::
-			"r" ((unsigned long){_inc_cpu_up_arg_raddr}),
-			"r"  (PARKPU_RLI16IMM_ADDR) :
-			"memory");
+		(*(volatile uint16_t *)PARKPU_RLI16IMM_ADDR) = _inc_cpu_up_arg_raddr;
 		unsigned long irqdst;
 		if (pu32_ishw) {
 			hwdrvintctrl_ack(old_cpu_up_arg, 0);
@@ -95,18 +89,12 @@ int __cpu_up (unsigned int cpu, struct task_struct *tidle) {
 	struct thread_info *ti = task_thread_info(tidle);
 	ti->last_cpu = ti->cpu = cpu;
 
-	cpu_up_arg = // Value to set in the cpu %sp.
-		// sizeof(struct pu32_pt_regs) accounts for the space
-		// used only if the thread ever become a user-thread.
-		((unsigned long)end_of_stack(tidle) - sizeof(struct pu32_pt_regs));
+	cpu_up_arg = ti->ksp; // Value to set in the cpu %sp.
 
 	extern char _start_smp[];
 	unsigned long _start_smp_raddr = ((unsigned long)_start_smp - (PARKPU_RLI16IMM_ADDR + 2));
 	BUG_ON(_start_smp_raddr>>16); // Insure address fit in 16bits.
-	asm volatile ("ldst16 %0, %1\n" ::
-		"r"((unsigned long){_start_smp_raddr}),
-		"r"(PARKPU_RLI16IMM_ADDR) :
-		"memory");
+	(*(volatile uint16_t *)PARKPU_RLI16IMM_ADDR) = _start_smp_raddr;
 
 	int ret = 0;
 	unsigned long irqdst;
@@ -168,48 +156,69 @@ void pu32_start_smp (void) {
 	current->active_mm = mm;
 	cpumask_set_cpu(raw_smp_processor_id(), mm_cpumask(mm));
 
+	c_setup();
+
+	void pu32_clockevent_init (void); pu32_clockevent_init();
+
 	enable_percpu_irq(PU32_IPI_IRQ, 0);
 
 	notify_cpu_starting(raw_smp_processor_id());
-	c_setup();
 	set_cpu_online(raw_smp_processor_id(), true);
 	pr_info("CPU%u online\n", (unsigned int)raw_smp_processor_id());
 	complete(&cpu_up_flag);
 
-	// Disable preemption before enabling interrupts, so we don't
-	// try to schedule a CPU that hasn't actually started yet.
-	preempt_disable();
-	void pu32_clockevent_init (void); pu32_clockevent_init();
 	pu32ctxswitchhdlr();
+
 	raw_local_irq_enable();
 	cpu_startup_entry(CPUHP_AP_ONLINE_IDLE);
 }
-
-struct ipi_data_struct {
-	unsigned long bits;
-};
-static struct ipi_data_struct ipi_data[NR_CPUS];
 
 enum ipi_msg_type {
 	IPI_EMPTY,
 	IPI_RESCHEDULE,
 	IPI_CALL_FUNC,
+	#ifdef CONFIG_IRQ_WORK
+	IPI_IRQ_WORK,
+	#endif
 	IPI_CPU_STOP,
 	IPI_MAX
 };
 
+struct ipi_data_struct {
+	unsigned long bits;
+	unsigned long stats[IPI_MAX];
+};
+static struct ipi_data_struct ipi_data[NR_CPUS];
+
 extern unsigned long pu32_kernelmode_stack[NR_CPUS];
 
 static irqreturn_t handle_ipi (int irq, void *dev) {
-	while (true) {
-		unsigned long ops = xchg(&ipi_data[raw_smp_processor_id()].bits, 0);
-		if (ops == 0)
-			return IRQ_HANDLED;
-		if (ops & (1 << IPI_RESCHEDULE))
+	unsigned long *stats = ipi_data[raw_smp_processor_id()].stats;
+	unsigned long ops = xchg(&ipi_data[raw_smp_processor_id()].bits, 0);
+	if (!ops) {
+		++stats[IPI_EMPTY];
+		return IRQ_HANDLED;
+	}
+	do {
+		if (ops & (1 << IPI_EMPTY)) {
+			BUG();
+		}
+		if (ops & (1 << IPI_RESCHEDULE)) {
+			++stats[IPI_RESCHEDULE];
 			scheduler_ipi();
-		if (ops & (1 << IPI_CALL_FUNC))
+		}
+		if (ops & (1 << IPI_CALL_FUNC)) {
+			++stats[IPI_CALL_FUNC];
 			generic_smp_call_function_interrupt();
+		}
+		#ifdef CONFIG_IRQ_WORK
+		if (ops & (1 << IPI_IRQ_WORK)) {
+			++stats[IPI_IRQ_WORK];
+			irq_work_run();
+		}
+		#endif
 		if (ops & (1 << IPI_CPU_STOP)) {
+			++stats[IPI_CPU_STOP];
 			if (pu32_ishw) // Disable core from receiving device interrupts.
 				hwdrvintctrl_ack(raw_smp_processor_id(), 0);
 			set_cpu_online(raw_smp_processor_id(), false);
@@ -219,14 +228,15 @@ static irqreturn_t handle_ipi (int irq, void *dev) {
 			BUG();
 		}
 		BUG_ON((ops >> IPI_MAX) != 0);
-	}
+		ops = xchg(&ipi_data[raw_smp_processor_id()].bits, 0);
+	} while (ops);
 	return IRQ_HANDLED;
 }
 
 static void ipi_msg (const struct cpumask *mask, enum ipi_msg_type msg_id) {
 	unsigned int cpu;
 	for_each_cpu(cpu, mask)
-		__set_bit(msg_id, &ipi_data[raw_smp_processor_id()].bits);
+		__set_bit(msg_id, &ipi_data[cpu].bits);
 	smp_mb();
 	for_each_cpu(cpu, mask) {
 		unsigned long irqdst;
@@ -247,6 +257,35 @@ static void ipi_msg (const struct cpumask *mask, enum ipi_msg_type msg_id) {
 	}
 }
 
+static const char * const ipi_names[] = {
+	[IPI_EMPTY]		= "Empty",
+	[IPI_RESCHEDULE]	= "Reschedule",
+	[IPI_CALL_FUNC]		= "Function call",
+	#ifdef CONFIG_IRQ_WORK
+	[IPI_IRQ_WORK]		= "IRQ work",
+	#endif
+	[IPI_CPU_STOP]		= "CPU stop",
+};
+
+int arch_show_interrupts(struct seq_file *p, int prec) {
+	unsigned int cpu, i;
+	for (i = 0; i < IPI_MAX; i++) {
+		if (!ipi_names[i])
+			continue;
+		seq_printf (p, "%*s:", prec, "IPI");
+		for_each_possible_cpu(cpu)
+			seq_printf(p, " %10lu", ipi_data[cpu].stats[i]);
+		seq_printf(p, "     %s\n", ipi_names[i]);
+	}
+	return 0;
+}
+
+#ifdef CONFIG_IRQ_WORK
+void arch_irq_work_raise (void) {
+	ipi_msg(cpumask_of(raw_smp_processor_id()), IPI_IRQ_WORK);
+}
+#endif
+
 void arch_send_call_function_ipi_mask (struct cpumask *mask) {
 	ipi_msg(mask, IPI_CALL_FUNC);
 }
@@ -266,10 +305,11 @@ void smp_send_stop (void) {
 	ipi_msg(&mask, IPI_CPU_STOP);
 }
 
+static int ipi_dummy_dev;
 void ipi_init (void) {
 	int rc = request_irq (
 		PU32_IPI_IRQ, handle_ipi,
-		IRQF_PERCPU|IRQF_NOBALANCING, "IPI", &((unsigned long){0}));
+		IRQF_PERCPU|IRQF_NOBALANCING, "IPI", &ipi_dummy_dev);
 	if (rc)
 		panic("IPI IRQ request failed\n");
 	enable_percpu_irq(PU32_IPI_IRQ, 0);
