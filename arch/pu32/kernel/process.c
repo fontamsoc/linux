@@ -70,7 +70,6 @@ void start_thread (struct pt_regs *regs, unsigned long pc, unsigned long sp) {
 // Implemented in kernel/entry.S .
 void ret_from_syscall (void);
 void ret_from_exception (void);
-void ret_from_interrupt (void);
 void ret_from_fork (void);
 void ret_from_kernel_thread (void);
 
@@ -204,6 +203,8 @@ void pu32ctxswitchhdlr (void) {
 	struct task_struct *tsk = ti->task;
 
 	pu32_cpu_curr[raw_smp_processor_id()] = tsk;
+
+	raw_local_irq_disable();
 
 	unsigned long hwflags = pu32hwflags[raw_smp_processor_id()];
 	hwflags &= ~PU32_FLAGS_USERSPACE;

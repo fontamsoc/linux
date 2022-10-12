@@ -143,14 +143,9 @@ static void pu32sysrethdlr_sysOpIntr (
 					if (prev || !next_ti_in_userspace) {
 						hwflags &= ~PU32_FLAGS_USERSPACE;
 						hwflags |= PU32_FLAGS_KERNELSPACE;
-						if (next_ti->preempt_count == PREEMPT_ENABLED)
-							raw_local_irq_enable();
-						else
-							raw_local_irq_disable();
 					} else {
 						hwflags &= ~PU32_FLAGS_KERNELSPACE;
 						hwflags |= PU32_FLAGS_USERSPACE;
-						raw_local_irq_enable();
 					}
 					pu32hwflags[raw_smp_processor_id()] = hwflags;
 

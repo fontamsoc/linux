@@ -46,13 +46,12 @@ static void pu32sysrethdlr_extIntr (unsigned long sysopcode) {
 		hwflags &= ~PU32_FLAGS_USERSPACE;
 		hwflags |= PU32_FLAGS_KERNELSPACE;
 		pu32hwflags[raw_smp_processor_id()] = hwflags;
-		raw_local_irq_disable();
 
 		asm volatile ("setugpr %%tp, %0\n" :: "r"(ti) : "memory");
 		asm volatile ("setugpr %%sp, %0\n" :: "r"(ti->ksp) : "memory");
 		//asm volatile ("setugpr %%1, %0\n" :: "r"() : "memory");
 		//asm volatile ("setugpr %%rp, %0\n" :: "r"() : "memory");
-		asm volatile ("setuip %0\n" :: "r"(ret_from_interrupt) : "memory");
+		asm volatile ("setuip %0\n" :: "r"(ret_from_exception) : "memory");
 		struct mm_struct *mm = tsk->active_mm;
 		asm volatile (
 			"cpy %%sr, %1\n"
