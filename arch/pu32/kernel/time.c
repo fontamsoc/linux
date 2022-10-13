@@ -18,13 +18,13 @@ void calibrate_delay (void) {
 		loops_per_jiffy);
 }
 
-static struct clock_event_device *clkevtdevs[NR_CPUS];
+static char clkevtdevs_names[NR_CPUS][9]; // Enough space for "timerXXX".
+static struct clock_event_device clkevtdevs[NR_CPUS];
 
 void pu32_timer_intr (void) {
 	raw_local_irq_disable();
 	irq_enter();
-	struct clock_event_device *e =
-		clkevtdevs[raw_smp_processor_id()];
+	struct clock_event_device *e = &clkevtdevs[raw_smp_processor_id()];
 	e->event_handler(e);
 	irq_exit();
 	raw_local_irq_enable();
@@ -45,15 +45,12 @@ static int pu32_timer_set_state_shutdown (
 
 void pu32_clockevent_init (void) {
 
-	struct clock_event_device *e =
-		kzalloc(sizeof(*e), GFP_ATOMIC);
-
 	unsigned cpu = raw_smp_processor_id();
 
-	clkevtdevs[cpu] = e;
+	struct clock_event_device *e = &clkevtdevs[cpu];
 
-	const unsigned strsz = 10;
-	char *s = kzalloc(strsz, GFP_ATOMIC);
+	const unsigned strsz = sizeof(clkevtdevs_names[0]);
+	char *s = clkevtdevs_names[cpu];
 	snprintf(s, strsz, "timer%u", cpu);
 
 	e->name = s;
