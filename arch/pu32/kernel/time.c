@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // (c) William Fonkou Tambe
 
-#include <linux/clocksource.h>
 #include <linux/clockchips.h>
 #include <linux/sched_clock.h>
 #include <linux/hardirq.h>
@@ -18,18 +17,6 @@ void calibrate_delay (void) {
 		(loops_per_jiffy / (5000 / HZ)) % 100,
 		loops_per_jiffy);
 }
-
-static u64 tsc_read (struct clocksource *cs) {
-	return get_cycles();
-}
-
-static struct clocksource clocksource_tsc = {
-	.name		= "tsc",
-	.rating		= 400,
-	.read		= tsc_read,
-	.mask		= CLOCKSOURCE_MASK(64),
-	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-};
 
 static struct clock_event_device *clkevtdevs[NR_CPUS];
 
@@ -80,12 +67,6 @@ void pu32_clockevent_init (void) {
 }
 
 void __init time_init (void) {
-	clocksource_register_hz(&clocksource_tsc, pu32clkfreq());
-	// Optimize clocksource_tsc.mult and clocksource_tsc.shift .
-	while (!(clocksource_tsc.mult & 1) && clocksource_tsc.shift) {
-		clocksource_tsc.mult >>= 1;
-		--clocksource_tsc.shift;
-	}
 	u64 read_sched_clock (void) {
 		return get_cycles();
 	}
