@@ -44,6 +44,6 @@ static void pu32sysrethdlr_timerIntr (unsigned long sysopcode) {
 			"r"(mm->context),
 			"r"(mm->pgd) :
 			"memory");
-		asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
+		asm volatile ("setflags %0\n" :: "r"(hwflags | PU32_FLAGS_disIntr) : "memory");
 	}
 }

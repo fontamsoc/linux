@@ -18,6 +18,7 @@ config PU32
 	#select CONTEXT_TRACKING
 	select GENERIC_CPU_DEVICES if !NUMA
 	select GENERIC_SMP_IDLE_THREAD
+	select HAVE_IRQ_EXIT_ON_IRQ_STACK
 
 config SMP
 	def_bool n
