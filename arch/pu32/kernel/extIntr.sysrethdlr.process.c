@@ -38,11 +38,7 @@ static void pu32sysrethdlr_extIntr (unsigned long sysopcode) {
 		irqsrc = PU32_IPI_IRQ;
 
 	if (ret == sizeof(unsigned long)) {
-		// There are no saved interrupt context, but
-		// set_irq_regs() must be called with a non-null value.
-		struct pt_regs *old_regs = set_irq_regs((struct pt_regs *)-1);
 		do_IRQ(irqsrc);
-		set_irq_regs(old_regs);
 	}
 
 	skip_irq:;

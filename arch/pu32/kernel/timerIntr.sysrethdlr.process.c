@@ -17,11 +17,7 @@ static void pu32sysrethdlr_timerIntr (unsigned long sysopcode) {
 	}
 	#endif
 
-	// There are no saved interrupt context, but
-	// set_irq_regs() must be called with a non-null value.
-	struct pt_regs *old_regs = set_irq_regs((struct pt_regs *)-1);
 	pu32_timer_intr();
-	set_irq_regs(old_regs);
 
 	if (ti->preempt_count == PREEMPT_ENABLED && (ti->flags&_TIF_WORK_MASK)) {
 

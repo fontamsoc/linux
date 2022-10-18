@@ -26,7 +26,6 @@ struct thread_info {
 	unsigned long      in_fault; // Tell whether the thread is executing do_fault().
 	pu32FaultReason    faultreason; // Used to save pu32FaultReason when in_fault is non-null.
 	unsigned long      ksp, kr1, kpc;
-	struct pt_regs     *irq_regs;
 };
 
 #define __HAVE_THREAD_FUNCTIONS
