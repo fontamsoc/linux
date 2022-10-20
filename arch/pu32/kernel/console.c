@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // (c) William Fonkou Tambe
 
-#ifdef CONFIG_SMP
-#include <linux/spinlock.h>
-#endif
 #include <linux/console.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
@@ -41,17 +38,8 @@ static LIST_HEAD(pu32tty_devs);
 
 extern unsigned long pu32_ishw;
 
-#ifdef CONFIG_SMP
-static DEFINE_SPINLOCK(pu32tty_lock);
-#endif
-
 static void pu32tty_write (
 	struct console *con, const char *s, unsigned n) {
-	unsigned long flags;
-	raw_local_irq_save(flags);
-	#ifdef CONFIG_SMP
-	spin_lock(&pu32tty_lock);
-	#endif
 	unsigned long i;
 	pu32tty_dev_t *dev = container_of(con, pu32tty_dev_t, console);
 	if (pu32_ishw) {
@@ -61,10 +49,6 @@ static void pu32tty_write (
 		for (i = 0; i < n;)
 			i += pu32syswrite (PU32_BIOS_FD_STDOUT, (void *)s+i, n-i);
 	}
-	#ifdef CONFIG_SMP
-	spin_unlock(&pu32tty_lock);
-	#endif
-	raw_local_irq_restore(flags);
 }
 
 static struct tty_driver *pu32tty_driver;
