@@ -59,10 +59,11 @@ void __init setup_smp (void) {
 		}
 		if (irqdst == -1)
 			break;
-		unsigned long timeout;
-		for (	timeout = msecs_to_jiffies(10000);
-			cpu_up_arg == old_cpu_up_arg && timeout;
-			--timeout);
+		unsigned long timeout = (jiffies + msecs_to_jiffies(10000));
+		do {
+			if (cpu_up_arg != old_cpu_up_arg)
+				break;
+		} while (time_before(jiffies, timeout));
 		if (cpu_up_arg != old_cpu_up_arg) {
 			if (cpu_up_arg > nr_cpu_ids) {
 				pr_warn("Total number of cpus greater than %d\n", nr_cpu_ids);
@@ -82,8 +83,6 @@ void __init setup_smp (void) {
 	}
 }
 
-static DECLARE_COMPLETION(cpu_up_flag);
-
 int __cpu_up (unsigned int cpu, struct task_struct *tidle) {
 
 	struct thread_info *ti = task_thread_info(tidle);
@@ -98,8 +97,7 @@ int __cpu_up (unsigned int cpu, struct task_struct *tidle) {
 
 	int ret = 0;
 	unsigned long irqdst;
-	unsigned long timeout;
-	timeout = msecs_to_jiffies(10000);
+	unsigned long timeout = (jiffies + msecs_to_jiffies(10000));
 	do {
 		if (pu32_ishw) {
 			hwdrvintctrl_ack(cpu, 0);
@@ -113,20 +111,22 @@ int __cpu_up (unsigned int cpu, struct task_struct *tidle) {
 			// Read IPI request response.
 			pu32sysread (PU32_BIOS_FD_INTCTRLDEV, (void *)&irqdst, sizeof(unsigned long));
 		}
-	} while (irqdst == -2 && timeout--);
+		if (irqdst != -2)
+			break;
+	} while (time_before(jiffies, timeout));
 	if (irqdst == -1) {
 		pr_crit("CPU%u failed to start\n", cpu);
 		ret = -EOPNOTSUPP;
 		goto done;
 	}
+	timeout = (jiffies + msecs_to_jiffies(10000));
+	do {
+		if (cpu_online(cpu))
+			goto done;
+	} while (time_before(jiffies, timeout));
 
-	wait_for_completion_timeout(&cpu_up_flag, msecs_to_jiffies(10000));
-
-	if (!cpu_online(cpu)) {
-		pr_crit("CPU%u startup timeout\n", cpu);
-		ret = -EIO;
-		goto done;
-	}
+	pr_crit("CPU%u startup timeout\n", cpu);
+	ret = -EIO;
 
 	done:;
 	return ret;
@@ -165,7 +165,6 @@ void pu32_start_smp (void) {
 	notify_cpu_starting(raw_smp_processor_id());
 	set_cpu_online(raw_smp_processor_id(), true);
 	pr_info("CPU%u online\n", (unsigned int)raw_smp_processor_id());
-	complete(&cpu_up_flag);
 
 	pu32ctxswitchhdlr();
 
