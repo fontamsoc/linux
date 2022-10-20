@@ -23,7 +23,7 @@ void arch_local_irq_restore (unsigned long irqflags) {
 	// disable IRQs first to avoid unwanted preemption.
 	__asm__ __volatile__ (
 		"setflags %0\n" ::
-		"r"(pu32hwflags[raw_smp_processor_id()] | PU32_FLAGS_disIntr) :
+		"r"(PU32_FLAGS_KERNELSPACE | PU32_FLAGS_disIntr) :
 		"memory");
 
 	pu32irqflags[raw_smp_processor_id()] = irqflags;
