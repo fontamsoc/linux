@@ -15,21 +15,6 @@
 #define PARKPU_ADDR          (KERNELADDR - PARKPUSZ)
 #define PARKPU_RLI16IMM_ADDR (PARKPU_ADDR + 14)
 
-#ifndef __ASSEMBLY__
-
-#include <linux/kernel.h>
-#include <linux/types.h>
-
-#include <asm/timex.h>
-#include <asm/syscall.h>
-
-// RoundDown to power of two.
-#define ROUNDDOWNTOPOWEROFTWO(VALUE,POWEROFTWO) \
-	((VALUE) & -(POWEROFTWO))
-// RoundUp to power of two.
-#define ROUNDUPTOPOWEROFTWO(VALUE,POWEROFTWO) \
-	ROUNDDOWNTOPOWEROFTWO(((VALUE) + ((POWEROFTWO)-1)), POWEROFTWO)
-
 #define PU32_BIOS_FD_STDIN             4
 #define PU32_BIOS_FD_STDOUT            1
 #define PU32_BIOS_FD_STDERR            2
@@ -81,6 +66,21 @@
 
 #define PU32_CAP_mmu	0x1
 #define PU32_CAP_hptw	0x2
+
+#ifndef __ASSEMBLY__
+
+#include <linux/kernel.h>
+#include <linux/types.h>
+
+#include <asm/timex.h>
+#include <asm/syscall.h>
+
+// RoundDown to power of two.
+#define ROUNDDOWNTOPOWEROFTWO(VALUE,POWEROFTWO) \
+	((VALUE) & -(POWEROFTWO))
+// RoundUp to power of two.
+#define ROUNDUPTOPOWEROFTWO(VALUE,POWEROFTWO) \
+	ROUNDDOWNTOPOWEROFTWO(((VALUE) + ((POWEROFTWO)-1)), POWEROFTWO)
 
 typedef enum {
 	pu32ReadFaultIntr,

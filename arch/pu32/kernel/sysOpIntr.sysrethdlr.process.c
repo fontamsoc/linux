@@ -67,7 +67,7 @@ static void pu32sysrethdlr_sysOpIntr (
 					"r"(mm->context),
 					"r"(mm->pgd) :
 					"memory");
-				asm volatile ("setflags %0\n" :: "r"(hwflags | PU32_FLAGS_disIntr) : "memory");
+				asm volatile ("setflags %0\n" :: "r"(PU32_FLAGS_KERNELSPACE | PU32_FLAGS_disIntr) : "memory");
 
 				return;
 
@@ -273,7 +273,7 @@ static void pu32sysrethdlr_sysOpIntr (
 				"r"(mm->context),
 				"r"(mm->pgd) :
 				"memory");
-			asm volatile ("setflags %0\n" :: "r"(hwflags | PU32_FLAGS_disIntr) : "memory");
+			asm volatile ("setflags %0\n" :: "r"(PU32_FLAGS_KERNELSPACE | PU32_FLAGS_disIntr) : "memory");
 
 			return;
 		}
