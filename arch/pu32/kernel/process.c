@@ -18,9 +18,6 @@
 
 #include <pu32.h>
 
-// Buffer used in various locations with snprintf().
-char pu32strbuf[PU32STRBUFSZ];
-
 unsigned long pu32_ret_to_kernelspace (struct thread_info *ti) {
 	/* To be used after save_pu32umode_regs() or before restore_pu32umode_regs().
 	   When checking whether the task returns to userspace,
