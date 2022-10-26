@@ -174,6 +174,12 @@ static inline ssize_t pu32syswrite (int fd, void *buf, size_t count) {
 
 void pu32printf (const char *fmt, ...);
 
+#define pu32hang(...) ({ \
+	pu32printf (__VA_ARGS__); \
+	void dump_stack(void); \
+	dump_stack(); \
+	asm volatile ("rli %%sr; j %%sr\n" ::: "memory"); })
+
 static inline off_t pu32syslseek (int fd, off_t offset, int whence) {
 
 	register uintptr_t a1 asm("%1") = fd;

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // (c) William Fonkou Tambe
 
-#include "hang.process.c"
 #include "regs.process.c"
 
 #include "sysOpIntr.sysrethdlr.process.c"
