@@ -2,13 +2,20 @@
 // (c) William Fonkou Tambe
 
 #include <linux/string.h>
+#ifdef CONFIG_SMP
+#include <linux/spinlock.h>
+#endif
 
 #include <pu32.h>
 
-#define PU32PRINTFBUFSZ 1024
-static char pu32printfbuf[PU32PRINTFBUFSZ];
-
 void pu32printf (const char *fmt, ...) {
+	#define PU32PRINTFBUFSZ 1024
+	static char pu32printfbuf[PU32PRINTFBUFSZ];
+
+	#ifdef CONFIG_SMP
+	static DEFINE_SPINLOCK(pu32printf_lock);
+	spin_lock(&pu32printf_lock);
+	#endif
 
 	va_list args;
 
@@ -20,12 +27,15 @@ void pu32printf (const char *fmt, ...) {
 	char *s = pu32printfbuf; unsigned n = strlen(pu32printfbuf);
 	unsigned i; for (i = 0; i < n;)
 		i += pu32syswrite (PU32_BIOS_FD_STDOUT, s+i, n-i);
+
+	#ifdef CONFIG_SMP
+	spin_unlock(&pu32printf_lock);
+	#endif
 }
 
-#define PU32SYSOPCODESTRBUFSZ 64
-static char pu32sysopcodestrbuf[PU32SYSOPCODESTRBUFSZ];
-
 char *pu32sysopcodestr (unsigned long sysopcode) {
+	#define PU32SYSOPCODESTRBUFSZ 64
+	static char pu32sysopcodestrbuf[PU32SYSOPCODESTRBUFSZ];
 	unsigned long o = 0;
 	void decode1gpr (void) {
 		o += snprintf (&pu32sysopcodestrbuf[o], PU32SYSOPCODESTRBUFSZ-o, "%%%ld", (((sysopcode>>8)&0xf0)>>4));
