@@ -99,9 +99,6 @@ config GENERIC_CSUM
 config STACKTRACE_SUPPORT
 	def_bool y
 
-config LOCKDEP_SUPPORT
-	def_bool  y
-
 config HW_RANDOM
 	default n
 
@@ -152,5 +149,7 @@ config PU32_DEBUG
 	select RCU_EQS_DEBUG
 	select PRINTK_CALLER
 	select DEBUG_IRQFLAGS
+	select TRACE_IRQFLAGS_SUPPORT
+	select TRACE_IRQFLAGS
 
 source "arch/pu32/drivers/Kconfig"
