@@ -87,6 +87,8 @@ int copy_thread (struct task_struct *p, const struct kernel_clone_args *args) {
 		// a user-thread; it further gets modified by start_thread().
 		struct pu32_pt_regs *eos = (struct pu32_pt_regs *)end_of_stack(p);
 		struct pu32_pt_regs *ppr = eos-1;
+		ppr->faultreason = pu32PreemptIntr; // will not be used by __NR_PU32_switch_to.
+		ppr->sysopcode = PU32_OPNOTAVAIL; // will not be used by __NR_PU32_switch_to.
 		ppr->prev_ksp_offset = ((unsigned long)eos & (THREAD_SIZE - 1));
 
 		unsigned long sp = (unsigned long)ppr;
@@ -99,7 +101,7 @@ int copy_thread (struct task_struct *p, const struct kernel_clone_args *args) {
 		ppr->regs.sp = sp;
 		ppr->regs.fp = 0;
 		ppr->regs.rp = (unsigned long)ret_from_kernel_thread;
-		// ppr->regs.pc will not be used by __NR_PU32_switch_to.
+		ppr->regs.pc = 0; // will not be used by __NR_PU32_switch_to.
 
 		pti->ksp = (unsigned long)ppr;
 
@@ -128,7 +130,7 @@ int copy_thread (struct task_struct *p, const struct kernel_clone_args *args) {
 		ppr->regs.sp = sp;
 		ppr->regs.fp = 0;
 		ppr->regs.rp = (unsigned long)ret_from_fork;
-		// ppr->regs.pc will not be used by __NR_PU32_switch_to.
+		ppr->regs.pc = 0; // will not be used by __NR_PU32_switch_to.
 
 		pti->ksp = (unsigned long)ppr;
 	}
