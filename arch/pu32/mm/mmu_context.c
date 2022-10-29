@@ -14,12 +14,9 @@ static DEFINE_SPINLOCK(mmu_context_lock);
 #define PU32_NR_ASIDS (1<<12)
 static DECLARE_BITMAP(mmu_context, PU32_NR_ASIDS);
 
-static unsigned long last_mmu_context = PU32_NO_CONTEXT;
+static volatile unsigned long last_mmu_context = PU32_NO_CONTEXT;
 
 unsigned long get_mmu_context (void) {
-
-	unsigned long flags;
-	raw_local_irq_save(flags);
 
 	#ifdef CONFIG_SMP
 	spin_lock(&mmu_context_lock);
@@ -42,8 +39,6 @@ unsigned long get_mmu_context (void) {
 	spin_unlock(&mmu_context_lock);
 	#endif
 
-	raw_local_irq_restore(flags);
-
 	return context;
 }
 
@@ -52,9 +47,6 @@ void put_mmu_context (unsigned long context) {
 	#if defined(CONFIG_PU32_DEBUG)
 	BUG_ON (context == PU32_NO_CONTEXT);
 	#endif
-
-	unsigned long flags;
-	raw_local_irq_save(flags);
 
 	#ifdef CONFIG_SMP
 	spin_lock(&mmu_context_lock);
@@ -65,8 +57,6 @@ void put_mmu_context (unsigned long context) {
 	#ifdef CONFIG_SMP
 	spin_unlock(&mmu_context_lock);
 	#endif
-
-	raw_local_irq_restore(flags);
 }
 
 void __init init_mmu_context (void) {
