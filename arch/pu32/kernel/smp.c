@@ -30,6 +30,21 @@ volatile unsigned int cpu_up_arg;
 
 extern unsigned long pu32_ishw;
 
+static unsigned long pu32_send_ipi (unsigned int cpu) {
+		unsigned long irqdst;
+		if (pu32_ishw) {
+			irqdst = hwdrvintctrl_int(cpu);
+		} else {
+			// Discard any data currently buffered in PU32_BIOS_FD_INTCTRLDEV.
+			while (pu32sysread (PU32_BIOS_FD_INTCTRLDEV, &irqdst, sizeof(unsigned long)));
+			// Send IPI to cpu.
+			pu32syswrite (PU32_BIOS_FD_INTCTRLDEV, (void *)&cpu, sizeof(unsigned long));
+			// Read IPI request response.
+			pu32sysread (PU32_BIOS_FD_INTCTRLDEV, (void *)&irqdst, sizeof(unsigned long));
+		}
+		return irqdst;
+}
+
 void __init setup_smp (void) {
 
 	cpu_up_arg = 1;
@@ -40,19 +55,7 @@ void __init setup_smp (void) {
 		unsigned int old_cpu_up_arg = cpu_up_arg;
 		BUG_ON(_inc_cpu_up_arg_raddr>>16); // Insure address fit in 16bits.
 		(*(volatile uint16_t *)PARKPU_RLI16IMM_ADDR) = _inc_cpu_up_arg_raddr;
-		unsigned long irqdst;
-		if (pu32_ishw) {
-			hwdrvintctrl_ack(old_cpu_up_arg, 0);
-			irqdst = hwdrvintctrl_int(old_cpu_up_arg);
-			hwdrvintctrl_ack(old_cpu_up_arg, 0);
-		} else {
-			// Discard any data currently buffered in PU32_BIOS_FD_INTCTRLDEV.
-			while (pu32sysread (PU32_BIOS_FD_INTCTRLDEV, &irqdst, sizeof(unsigned long)));
-			// Send IPI to old_cpu_up_arg.
-			pu32syswrite (PU32_BIOS_FD_INTCTRLDEV, (void *)&old_cpu_up_arg, sizeof(unsigned long));
-			// Read IPI request response.
-			pu32sysread (PU32_BIOS_FD_INTCTRLDEV, (void *)&irqdst, sizeof(unsigned long));
-		}
+		unsigned long irqdst = pu32_send_ipi(old_cpu_up_arg);
 		if (irqdst == -2) {
 			pr_crit("CPU%u failed to start\n", old_cpu_up_arg);
 			break;
@@ -99,18 +102,7 @@ int __cpu_up (unsigned int cpu, struct task_struct *tidle) {
 	unsigned long irqdst;
 	unsigned long timeout = (jiffies + msecs_to_jiffies(10000));
 	do {
-		if (pu32_ishw) {
-			hwdrvintctrl_ack(cpu, 0);
-			irqdst = hwdrvintctrl_int(cpu);
-			hwdrvintctrl_ack(cpu, 0);
-		} else {
-			// Discard any data currently buffered in PU32_BIOS_FD_INTCTRLDEV.
-			while (pu32sysread (PU32_BIOS_FD_INTCTRLDEV, &irqdst, sizeof(unsigned long)));
-			// Send IPI to cpu.
-			pu32syswrite (PU32_BIOS_FD_INTCTRLDEV, (void *)&cpu, sizeof(unsigned long));
-			// Read IPI request response.
-			pu32sysread (PU32_BIOS_FD_INTCTRLDEV, (void *)&irqdst, sizeof(unsigned long));
-		}
+		irqdst = pu32_send_ipi(cpu);
 		if (irqdst != -2)
 			break;
 	} while (time_before(jiffies, timeout));
@@ -179,7 +171,6 @@ enum ipi_msg_type {
 	#ifdef CONFIG_IRQ_WORK
 	IPI_IRQ_WORK,
 	#endif
-	IPI_CPU_STOP,
 	IPI_MAX
 };
 
@@ -188,8 +179,6 @@ struct ipi_data_struct {
 	unsigned long stats[IPI_MAX];
 };
 static struct ipi_data_struct ipi_data[NR_CPUS];
-
-extern unsigned long pu32_kernelmode_stack[NR_CPUS];
 
 static irqreturn_t handle_ipi (int irq, void *dev) {
 	unsigned long *stats = ipi_data[raw_smp_processor_id()].stats;
@@ -216,16 +205,6 @@ static irqreturn_t handle_ipi (int irq, void *dev) {
 			irq_work_run();
 		}
 		#endif
-		if (ops & (1 << IPI_CPU_STOP)) {
-			++stats[IPI_CPU_STOP];
-			if (pu32_ishw) // Disable core from receiving device interrupts.
-				hwdrvintctrl_ack(raw_smp_processor_id(), 0);
-			set_cpu_online(raw_smp_processor_id(), false);
-			kfree((void *)pu32_kernelmode_stack[raw_smp_processor_id()]);
-			asm volatile ("j %0\n" :: "r"(PARKPU_ADDR) : "memory");
-			// It should never reach here.
-			BUG();
-		}
 		BUG_ON((ops >> IPI_MAX) != 0);
 		ops = xchg(&ipi_data[raw_smp_processor_id()].bits, 0);
 	} while (ops);
@@ -240,16 +219,7 @@ static void ipi_msg (const struct cpumask *mask, enum ipi_msg_type msg_id) {
 	for_each_cpu(cpu, mask) {
 		unsigned long irqdst;
 		do {
-			if (pu32_ishw) {
-				irqdst = hwdrvintctrl_int(cpu);
-			} else {
-				// Discard any data currently buffered in PU32_BIOS_FD_INTCTRLDEV.
-				while (pu32sysread (PU32_BIOS_FD_INTCTRLDEV, &irqdst, sizeof(unsigned long)));
-				// Send IPI to cpu.
-				pu32syswrite (PU32_BIOS_FD_INTCTRLDEV, (void *)&cpu, sizeof(unsigned long));
-				// Read IPI request response.
-				pu32sysread (PU32_BIOS_FD_INTCTRLDEV, (void *)&irqdst, sizeof(unsigned long));
-			}
+			irqdst = pu32_send_ipi(cpu);
 		} while (irqdst == -2);
 		if (irqdst == -1)
 			pr_crit("CPU%u ipi_msg failed\n", cpu);
@@ -263,7 +233,6 @@ static const char * const ipi_names[] = {
 	#ifdef CONFIG_IRQ_WORK
 	[IPI_IRQ_WORK]		= "IRQ work",
 	#endif
-	[IPI_CPU_STOP]		= "CPU stop",
 };
 
 int arch_show_interrupts(struct seq_file *p, int prec) {
@@ -272,7 +241,7 @@ int arch_show_interrupts(struct seq_file *p, int prec) {
 		if (!ipi_names[i])
 			continue;
 		seq_printf (p, "%*s:", prec, "IPI");
-		for_each_possible_cpu(cpu)
+		for_each_online_cpu(cpu)
 			seq_printf(p, " %10lu", ipi_data[cpu].stats[i]);
 		seq_printf(p, "     %s\n", ipi_names[i]);
 	}
@@ -298,10 +267,18 @@ void smp_send_reschedule (int cpu) {
 }
 
 void smp_send_stop (void) {
-	struct cpumask mask;
-	cpumask_copy(&mask, cpu_online_mask);
-	cpumask_clear_cpu(raw_smp_processor_id(), &mask);
-	ipi_msg(&mask, IPI_CPU_STOP);
+	unsigned int cpu;
+	for_each_online_cpu(cpu) {
+		if (cpu == raw_smp_processor_id())
+			continue;
+		set_cpu_online(cpu, false);
+		unsigned long irqdst;
+		do {
+			irqdst = pu32_send_ipi(cpu);
+		} while (irqdst == -2);
+		if (irqdst == -1)
+			pr_crit("smp_send_stop(): CPU%u failed\n", cpu);
+	}
 }
 
 static int ipi_dummy_dev;
@@ -338,9 +315,18 @@ void __cpu_die (unsigned int cpu) {
 void arch_cpu_idle_dead (void) {
 	idle_task_exit();
 	cpu_report_death();
-	ipi_msg(cpumask_of(raw_smp_processor_id()), IPI_CPU_STOP);
-	// It should never reach here.
-	BUG();
+	asm volatile (
+		"setflags %0\n" ::
+		"r"(PU32_FLAGS_KERNELSPACE | (PU32_FLAGS_disIntr & ~PU32_FLAGS_disExtIntr)) :
+		"memory");
+	unsigned int cpu = raw_smp_processor_id();
+	unsigned long irqdst;
+	do {
+		irqdst = pu32_send_ipi(cpu);
+	} while (irqdst == -2);
+	if (irqdst == -1)
+		pr_crit("arch_cpu_idle_dead(): CPU%u failed\n", cpu);
+	while(1);
 }
 
 #endif /* CONFIG_HOTPLUG_CPU */

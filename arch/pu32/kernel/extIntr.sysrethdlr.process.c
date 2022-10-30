@@ -2,6 +2,15 @@
 // (c) William Fonkou Tambe
 
 static void pu32sysrethdlr_extIntr (unsigned long sysopcode) {
+	#ifdef CONFIG_SMP
+	if (!cpu_online(raw_smp_processor_id())) {
+		pu32_irq_ack(0);
+		kfree((void *)pu32_kernelmode_stack[raw_smp_processor_id()]);
+		asm volatile ("j %0\n" :: "r"(PARKPU_ADDR) : "memory");
+		// It should never reach here.
+		BUG();
+	}
+	#endif
 
 	struct thread_info *ti = current_thread_info();
 	struct task_struct *tsk = ti->task;
