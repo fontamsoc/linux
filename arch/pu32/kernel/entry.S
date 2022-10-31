@@ -15,9 +15,6 @@ GLOBAL(ret_from_syscall)
 	rli %sr, pu32_save_syscall_retval
 	jl %rp, %sr
 GLOBAL(ret_from_exception)
-	li %sr, (PU32_FLAGS_KERNELSPACE | PU32_FLAGS_disIntr)
-	setflags %sr
-GLOBAL(ret_from_interrupt)
 	CURRENT_THREAD_INFO(%1)
 	rli %sr, pu32_ret_to_kernelspace
 	jl %rp, %sr

@@ -67,7 +67,7 @@ static void pu32sysrethdlr_sysOpIntr (
 					"r"(mm->context),
 					"r"(mm->pgd) :
 					"memory");
-				asm volatile ("setflags %0\n" :: "r"(PU32_FLAGS_KERNELSPACE | PU32_FLAGS_disIntr) : "memory");
+				asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
 
 				return;
 
@@ -163,7 +163,7 @@ static void pu32sysrethdlr_sysOpIntr (
 						"setugpr %%1, %2\n"
 						"setuip %3\n" ::
 						"r"(asid),
-						"r"(hwflags | (next_ti_in_userspace ? 0 : PU32_FLAGS_disIntr)),
+						"r"(hwflags),
 						"r"((unsigned long)prev ?: next_r1),
 						"r"((prev ? prev_pc : next_pc) +
 							((next_faultreason == pu32SysOpIntr) ?
@@ -273,7 +273,7 @@ static void pu32sysrethdlr_sysOpIntr (
 				"r"(mm->context),
 				"r"(mm->pgd) :
 				"memory");
-			asm volatile ("setflags %0\n" :: "r"(PU32_FLAGS_KERNELSPACE | PU32_FLAGS_disIntr) : "memory");
+			asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
 
 			return;
 		}

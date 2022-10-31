@@ -99,5 +99,5 @@ static void pu32sysrethdlr_faultIntr (pu32FaultReason faultreason, unsigned long
 		"r"(mm->context),
 		"r"(mm->pgd) :
 		"memory");
-	asm volatile ("setflags %0\n" :: "r"(PU32_FLAGS_KERNELSPACE | PU32_FLAGS_disIntr) : "memory");
+	asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
 }
