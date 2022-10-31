@@ -45,7 +45,13 @@ static unsigned long pu32_send_ipi (unsigned int cpu) {
 		return irqdst;
 }
 
+// Hold stack address to be used by _inc_cpu_up_arg().
+void *_inc_cpu_up_arg_stack_ptr = 0;
+
 void __init setup_smp (void) {
+
+	char _inc_cpu_up_arg_stack[64];
+	_inc_cpu_up_arg_stack_ptr = &_inc_cpu_up_arg_stack + 1;
 
 	cpu_up_arg = 1;
 

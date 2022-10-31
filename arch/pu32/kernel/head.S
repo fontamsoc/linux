@@ -63,6 +63,13 @@ ENTRY(_inc_cpu_up_arg)
 	li %1, -10
 	st16v %1, %sr
 
+	rli %sr, _inc_cpu_up_arg_stack_ptr
+	ld32v %sp, %sr
+
+	li %1, 0
+	rli %sr, pu32_irq_ack
+	jl %rp, %sr
+
 	rli %sr, cpu_up_arg
 	ld32v %1, %sr
 	inc8 %1, 1
@@ -81,6 +88,10 @@ ENTRY(_start_smp)
 
 	rli %sr, cpu_up_arg
 	ld32v %sp, %sr
+
+	li %1, 0
+	rli %sr, pu32_irq_ack
+	jl %rp, %sr
 
 	li %fp, 0
 
