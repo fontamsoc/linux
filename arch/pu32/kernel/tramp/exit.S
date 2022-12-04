@@ -9,4 +9,4 @@
 ENTRY(__tramp_exit)
 	li %sr, __NR_exit
 	syscall
-ENDPROC(__tramp_exit)
+END(__tramp_exit)

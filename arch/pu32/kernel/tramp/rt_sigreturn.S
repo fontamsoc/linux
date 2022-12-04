@@ -9,4 +9,4 @@
 ENTRY(__tramp_rt_sigreturn)
 	li %sr, __NR_rt_sigreturn
 	syscall
-ENDPROC(__tramp_rt_sigreturn)
+END(__tramp_rt_sigreturn)
