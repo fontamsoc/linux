@@ -15,9 +15,17 @@ void *uintset (void *s, int c, unsigned long cnt); __asm__ (
 
 	"jz %3, %rp\n"
 	"_uintset: cpy %4, %3\n"
-	"li8 %5, "__stringify(__SIZEOF_POINTER__)"\n"
-	"modu %4, %5\n"
-	"divu %3, %5\n"
+	#if __SIZEOF_POINTER__ == 8
+	"li8 %sr, 3\n"
+	"srl %3, %sr\n"
+	"li8 %sr, 7\n"
+	"and %4, %sr\n"
+	#else
+	"li8 %sr, 2\n"
+	"srl %3, %sr\n"
+	"li8 %sr, 3\n"
+	"and %4, %sr\n"
+	#endif
 	"rli %sr, 1f\n"
 	"jz %3, %sr\n"
 	"rli %sr, 0f\n"
