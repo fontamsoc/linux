@@ -55,7 +55,7 @@ module_param_cb(hw_en, &pu32hdd_param_hw_en_ops, &pu32hdd_param_hw_en, 0644);
 MODULE_PARM_DESC(hw_en, "use hw instead of bios");
 
 module_param_cb(irq_en, &pu32hdd_param_irq_en_ops, &pu32hdd_param_irq_en, 0644);
-MODULE_PARM_DESC(irq_en, "enable interrupt");
+MODULE_PARM_DESC(irq_en, "enable IRQs");
 
 static long pu32hdd_param_usebios = 0;
 static int __init pu32hdd_param_usebios_fn (char *buf) {
@@ -87,16 +87,18 @@ static struct pu32hdd_device {
 
 static DECLARE_WAIT_QUEUE_HEAD(pu32hdd_wq);
 
+// Flag used to properly sequence the use of
+// wait_event_interruptible() and wake_up_interruptible().
 volatile unsigned long hwdrvblkdev_rqst = 0;
 
 static void hwdrvblkdev_isbsy_ (void) {
-	unsigned long en = (pu32hdd_param_irq_en && preemptible() && !rcu_preempt_depth());
-	if (pu32hdd_irq != -1)
-		hwdrvintctrl_ena (pu32hdd_irq, en);
-	if (en)
-		wait_event_interruptible(pu32hdd_wq, (hwdrvblkdev_rqst == 0));
-	else
-		hwdrvblkdev_rqst = 0;
+	unsigned long en = (pu32hdd_param_irq_en && pu32hdd_irq != -1 && preemptible() && !rcu_preempt_depth());
+	if (!en)
+		return;
+	hwdrvintctrl_ena (pu32hdd_irq, 1);
+	hwdrvblkdev_rqst = 1;
+	wait_event_interruptible(pu32hdd_wq, (hwdrvblkdev_rqst == 0));
+	hwdrvintctrl_ena (pu32hdd_irq, 0);
 }
 
 static irqreturn_t pu32hdd_isr (int _, void *__) {
@@ -115,8 +117,6 @@ static blk_status_t pu32hdd_do_request (struct request *rq) {
 	void* buf = bio_data(rq->bio);
 	if ((pos + bufsz) > devsz)
 		bufsz = (unsigned long)(devsz - pos);
-	if (pu32hdd_irq != -1)
-		hwdrvintctrl_ena (pu32hdd_irq, (pu32hdd_param_hw_en && pu32hdd_param_irq_en));
 	unsigned long i = 0;
 	if (pu32hdd_param_hw_en) {
 		signed long ret;
@@ -126,7 +126,6 @@ static blk_status_t pu32hdd_do_request (struct request *rq) {
 					if ((ret = hwdrvblkdev_isrdy (&hwdrvblkdev_dev)) == -1)
 						return BLK_STS_IOERR;
 				} while (ret == 0);
-				hwdrvblkdev_rqst = 1;
 				hwdrvblkdev_write (&hwdrvblkdev_dev, buf+i, (pos+i)/BLKSZ, ((i + BLKSZ) < bufsz));
 				i += BLKSZ;
 			}
@@ -137,7 +136,6 @@ static blk_status_t pu32hdd_do_request (struct request *rq) {
 						if ((ret = hwdrvblkdev_isrdy (&hwdrvblkdev_dev)) == -1)
 							return BLK_STS_IOERR;
 					} while (ret == 0);
-					hwdrvblkdev_rqst = 1;
 				} while (!hwdrvblkdev_read (&hwdrvblkdev_dev, buf+i, (pos+i)/BLKSZ, ((i + BLKSZ) < bufsz)));
 				i += BLKSZ;
 			}
@@ -162,15 +160,15 @@ static blk_status_t pu32hdd_queue_rq (
 	const struct blk_mq_queue_data* bd) {
 	struct request *rq = bd->rq;
 	struct pu32hdd_device *dev = rq->q->queuedata;
-	if (!spin_trylock (&dev->lock))
-		return BLK_STS_DEV_RESOURCE;
+	//if (!spin_trylock (&dev->lock))
+	//	return BLK_STS_DEV_RESOURCE;
 	blk_status_t status = BLK_STS_OK;
 	blk_mq_start_request(rq);
 	do {
 		status = pu32hdd_do_request(rq);
 	} while (blk_update_request(rq, status, blk_rq_cur_bytes(rq)));
 	__blk_mq_end_request (rq, status);
-	spin_unlock (&dev->lock);
+	//spin_unlock (&dev->lock);
 	return status;
 }
 
@@ -211,12 +209,13 @@ unsigned long hwdrvblkdev_init_ (void) {
 			pr_err("request_irq(%lu) == %d\n", hwdrvdevtbl_dev.intridx, ret);
 		else {
 			hwdrvblkdev_isbsy = hwdrvblkdev_isbsy_;
-			hwdrvintctrl_ena (hwdrvdevtbl_dev.intridx, 1);
 			pu32hdd_irq = hwdrvdevtbl_dev.intridx;
+			// Keep pu32hdd_irq disabled, as it is to
+			// be enabled only by hwdrvblkdev_isbsy_().
+			hwdrvintctrl_ena (pu32hdd_irq, 0);
 		}
 	}
 	hwdrvblkdev_dev.addr = hwdrvdevtbl_dev.addr;
-	hwdrvblkdev_rqst = 1;
 	if (!hwdrvblkdev_init (&hwdrvblkdev_dev, 0))
 		goto out_free_irq;
 	pu32hdd_param_irq_en = (pu32hdd_irq != -1);
