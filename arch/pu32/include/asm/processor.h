@@ -16,7 +16,7 @@
 extern unsigned long pu32_TASK_UNMAPPED_BASE;
 #define TASK_UNMAPPED_BASE pu32_TASK_UNMAPPED_BASE
 
-#define cpu_relax() asm volatile("preemptctx\n" ::: "memory")
+#define cpu_relax() barrier()
 
 // thread_info is used instead.
 struct thread_struct {};
