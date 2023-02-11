@@ -55,9 +55,11 @@
 	PU32_FLAGS_cacherst		|\
 	PU32_FLAGS_gettlb		|\
 	PU32_FLAGS_setflags		|\
-	PU32_FLAGS_halt			)
+	PU32_FLAGS_halt			|\
+	PU32_FLAGS_disPreemptIntr	)
 
-#define PU32_FLAGS_USERSPACE 0;
+#define PU32_FLAGS_USERSPACE		(\
+	PU32_FLAGS_disPreemptIntr	)
 
 #define PU32_FLAGS_disIntr		(\
 	PU32_FLAGS_disExtIntr		|\
