@@ -25,9 +25,6 @@ struct thread_struct {};
 #define KSTK_ESP(tsk)	(task_pt_regs(tsk)->sp)
 #define KSTK_EIP(tsk)	(task_pt_regs(tsk)->pc)
 
-// Free all resources held by a thread.
-static inline void release_thread (struct task_struct *dead_task) {}
-
 // Do necessary setup to start up a newly executed thread.
 extern void start_thread (struct pt_regs *regs, unsigned long pc, unsigned long sp);
 
