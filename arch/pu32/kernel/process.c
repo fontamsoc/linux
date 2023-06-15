@@ -39,6 +39,8 @@ void pu32_save_syscall_retval (
 	unsigned long syscall_retval) {
 	struct thread_info *ti = current_thread_info();
 	pu32_ti_pt_regs(ti)->regs.r1 = syscall_retval;
+	if (test_thread_flag(TIF_SYSCALL_TRACE))
+		ptrace_report_syscall_exit(&pu32_tsk_pt_regs(current)->regs, 0);
 	return;
 }
 

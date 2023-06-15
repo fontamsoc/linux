@@ -59,7 +59,20 @@ static void pu32sysrethdlr_sysOpIntr (
 				asm volatile ("setugpr %%tp, %0\n" :: "r"(ti) : "memory");
 				asm volatile ("setugpr %%sp, %0\n" :: "r"(ti->ksp) : "memory");
 				asm volatile ("setugpr %%rp, %0\n" :: "r"(ret_from_syscall) : "memory");
-				asm volatile ("setuip %0\n" :: "r"(syscall_table[syscallnr]) : "memory");
+				if (test_thread_flag(TIF_SYSCALL_TRACE)) {
+					long do_syscall_trace (void) {
+						struct pt_regs *regs = &pu32_tsk_pt_regs(current)->regs;
+						if (ptrace_report_syscall_entry(regs))
+							return -ENOSYS;
+						typedef long (*sys_call_fn)(unsigned long, unsigned long,
+							unsigned long, unsigned long, unsigned long, unsigned long);
+						sys_call_fn syscall_fn;
+						syscall_fn = syscall_table[regs->sr];
+						return syscall_fn(regs->r1, regs->r2, regs->r3, regs->r4, regs->r5, regs->r6);
+					}
+					asm volatile ("setuip %0\n" :: "r"(do_syscall_trace) : "memory");
+				} else
+					asm volatile ("setuip %0\n" :: "r"(syscall_table[syscallnr]) : "memory");
 				struct mm_struct *mm = tsk->active_mm;
 				asm volatile (
 					"cpy %%sr, %1\n"
