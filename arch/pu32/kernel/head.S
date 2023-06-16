@@ -7,8 +7,7 @@
 #include <asm/thread_info.h>
 #include <generated/asm-offsets.h>
 
-__INIT
-
+__HEAD
 ENTRY(_start)
 
 	# The following convention is used:

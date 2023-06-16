@@ -5,8 +5,6 @@ KBUILD_CFLAGS += -O3 -g3 -mzpoprp
 KBUILD_CFLAGS += -fno-builtin -Werror=implicit-function-declaration -fno-trampolines -Wno-declaration-after-statement
 KBUILD_AFLAGS += $(KBUILD_CFLAGS)
 
-head-y := arch/pu32/kernel/head.o
-
 libs-y += arch/pu32/lib/
 
 drivers-y += arch/pu32/drivers/
