@@ -84,7 +84,8 @@ static inline void local_flush_tlb_mm (struct mm_struct *mm) {
 	raw_local_irq_save(flags);
 	unsigned long context = mm->context;
 	struct vm_area_struct *vma;
-	for (vma = mm->mmap; vma != NULL; vma = vma->vm_next) {
+	MA_STATE(mas, &mm->mm_mt, 0, 0);
+	mas_for_each(&mas, vma, ULONG_MAX) {
 		unsigned long start = vma->vm_start;
 		unsigned long end = vma->vm_end;
 		for (; start < end; start += PAGE_SIZE) {
