@@ -179,8 +179,6 @@ static inline unsigned long pmd_page_vaddr (pmd_t pmd) {
 #define MAX_SWAPFILES_CHECK() \
 	BUILD_BUG_ON(MAX_SWAPFILES_SHIFT > __SWP_TYPE_BITS)
 
-#define kern_addr_valid(addr)	(1)
-
 void update_mmu_cache (struct vm_area_struct *vma, unsigned long addr, pte_t *ptep);
 
 #endif /* !__ASSEMBLY__ */
