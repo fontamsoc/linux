@@ -161,6 +161,7 @@ unsigned long __get_wchan (struct task_struct *tsk) {
 void arch_cpu_idle (void) {
 	raw_local_irq_enable();
 	asm volatile ("halt\n" ::: "memory");
+	raw_local_irq_disable();
 }
 
 int do_fault (unsigned long addr, pu32FaultReason faultreason);
