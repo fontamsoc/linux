@@ -156,7 +156,10 @@ static inline unsigned long pmd_page_vaddr (pmd_t pmd) {
 // Swap entries are stored in the Linux
 // page tables as follows:
 //   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
-//   offset................................. type..... 0 0 0 0 0 0 0
+//   offset................................. type..... E 0 0 0 0 0 0
+
+/* We borrow bit 6 to store the exclusive marker in swap PTEs. */
+#define _PAGE_SWP_EXCLUSIVE (1<<6)
 
 // This implement up to 2**5 == 32 swap-files
 // and 2**20 * 4K == 4G per swap-file.
@@ -175,6 +178,21 @@ static inline unsigned long pmd_page_vaddr (pmd_t pmd) {
 	((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(swp) \
 	((pte_t) { (swp).val })
+
+#define __HAVE_ARCH_PTE_SWP_EXCLUSIVE
+static inline int pte_swp_exclusive (pte_t pte) {
+       return pte_val(pte) & _PAGE_SWP_EXCLUSIVE;
+}
+
+static inline pte_t pte_swp_mkexclusive (pte_t pte) {
+       pte_val(pte) |= _PAGE_SWP_EXCLUSIVE;
+       return pte;
+}
+
+static inline pte_t pte_swp_clear_exclusive (pte_t pte) {
+       pte_val(pte) &= ~_PAGE_SWP_EXCLUSIVE;
+       return pte;
+}
 
 #define MAX_SWAPFILES_CHECK() \
 	BUILD_BUG_ON(MAX_SWAPFILES_SHIFT > __SWP_TYPE_BITS)
