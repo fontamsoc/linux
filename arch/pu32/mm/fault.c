@@ -127,6 +127,8 @@ good_area:;
 	vm_fault_t fault = handle_mm_fault (vma, addr, flags, regs);
 
 	if (fault_signal_pending(fault, regs)) {
+		if (!faulted_in_userspace)
+			goto exception;
 		ret = -1;
 		goto done;
 	}
