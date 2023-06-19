@@ -47,7 +47,8 @@ typedef struct page *pgtable_t;
 #define page_to_phys(page) (page_to_pfn(page) << PAGE_SHIFT)
 #define phys_to_page(addr) (pfn_to_page((addr) >> PAGE_SHIFT))
 
-#define pfn_valid(pfn)        ((pfn) < max_mapnr)
+#define ARCH_PFN_OFFSET (0x1000 >> PAGE_SHIFT)
+
 #define	virt_addr_valid(addr) (pfn_valid(virt_to_pfn(addr)))
 
 #endif /* __ASSEMBLY__ */
