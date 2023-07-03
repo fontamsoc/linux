@@ -155,7 +155,7 @@ unsigned long __get_wchan (struct task_struct *tsk) {
 	if (!task_stack_page(tsk))
 		return 0;
 
-	return task_pt_regs(tsk)->pc;
+	return pu32_tsk_pt_regs(tsk)->regs.pc;
 }
 
 void arch_cpu_idle (void) {

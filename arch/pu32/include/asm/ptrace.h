@@ -38,8 +38,13 @@ struct pu32_pt_regs {
 	struct pt_regs		regs;
 };
 
-#define pu32_ti_pt_regs(ti)	((struct pu32_pt_regs *)ti->ksp)
-#define pu32_tsk_pt_regs(tsk)	((struct pu32_pt_regs *)task_thread_info(tsk)->ksp)
-#define task_pt_regs(tsk)	((struct pt_regs *)&pu32_tsk_pt_regs(tsk)->regs)
+#define pu32_ti_pt_regs(ti) ((struct pu32_pt_regs *)ti->ksp)
+#define pu32_tsk_pt_regs(tsk) ((struct pu32_pt_regs *)task_thread_info(tsk)->ksp)
+#define task_pt_regs(tsk) ({ \
+	struct pu32_pt_regs *ksp = pu32_tsk_pt_regs(tsk); \
+	while (ksp != ((struct pu32_pt_regs *)pu32_stack_bottom(ksp)-1)) { \
+		ksp = (struct pu32_pt_regs *)(((unsigned long)ksp & ~(THREAD_SIZE - 1)) + ksp->prev_ksp_offset); \
+	} \
+	&ksp->regs;})
 
 #endif	/* __ASM_PU32_PTRACE_H */

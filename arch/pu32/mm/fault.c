@@ -17,7 +17,7 @@
 int do_fault (unsigned long addr, pu32FaultReason faultreason) {
 
 	struct task_struct *tsk = current;
-	struct pt_regs *regs = task_pt_regs(tsk);
+	struct pt_regs *regs = &pu32_tsk_pt_regs(tsk)->regs;
 	struct thread_info *ti = task_thread_info(tsk);
 
 	ti->in_fault = 1;

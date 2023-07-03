@@ -107,7 +107,7 @@ static void pu32sysrethdlr_sysOpIntr (
 							PU32_PT_REGS_WHICH_SPFPRP,
 							pu32SysOpIntr, sysopcode);
 						// Capture prev_pc after save_pu32umode_regs().
-						prev_pc = task_pt_regs(prev)->pc;
+						prev_pc = pu32_tsk_pt_regs(prev)->regs.pc;
 						next_faultreason = pu32SysOpIntr; // __switch_to() uses syscall.
 
 						pu32_cpu_curr[raw_smp_processor_id()] = next;
