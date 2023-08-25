@@ -159,7 +159,7 @@ static blk_status_t pu32hdd_queue_rq (
 	struct blk_mq_hw_ctx *hctx,
 	const struct blk_mq_queue_data* bd) {
 	struct request *rq = bd->rq;
-	struct pu32hdd_device *dev = rq->q->queuedata;
+	//struct pu32hdd_device *dev = rq->q->queuedata;
 	//if (!spin_trylock (&dev->lock))
 	//	return BLK_STS_DEV_RESOURCE;
 	blk_status_t status = BLK_STS_OK;
