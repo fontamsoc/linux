@@ -78,7 +78,7 @@ config HZ
 
 config ARCH_FORCE_MAX_ORDER
         int
-        default 13
+        default 12
 
 # TODO: Must be kept 0 until there is a way to guarantee
 # that kernel stacks are naturally aligned; otherwise checks
