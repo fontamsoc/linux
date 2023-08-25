@@ -332,7 +332,7 @@ void arch_cpu_idle_dead (void) {
 	} while (irqdst == -2);
 	if (irqdst == -1)
 		pr_crit("arch_cpu_idle_dead(): CPU%u failed\n", cpu);
-	while(1);
+	BUG();
 }
 
 #endif /* CONFIG_HOTPLUG_CPU */
