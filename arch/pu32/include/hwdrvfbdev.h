@@ -12,14 +12,14 @@
 
 static inline unsigned long hwdrvfbdev_srcset (void *addr, unsigned long vsrc) {
 	vsrc <<= 2;
-	__asm__ __volatile__ ("ldst %0, %1" : "+r" (vsrc) : "r" (addr));
+	__asm__ __volatile__ ("ldst %0, %1" : "+r" (vsrc) : "r" (addr) : "memory");
 	return vsrc;
 }
 
 static inline unsigned long hwdrvfbdev_getinfo (void *addr, unsigned long param) {
 	param <<= 2;
 	param |= 1;
-	__asm__ __volatile__ ("ldst %0, %1" : "+r" (param) : "r" (addr));
+	__asm__ __volatile__ ("ldst %0, %1" : "+r" (param) : "r" (addr) : "memory");
 	return param;
 }
 

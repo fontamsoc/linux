@@ -9,33 +9,33 @@
 
 #include <asm/errno.h>
 
-#define __futex_atomic_op(insn, ret, oldval, uaddr, oparg)	\
-	__asm__ __volatile__ (					\
-		"1:\n"						\
-		"ld32 %1, %2\n"					\
-		insn"\n"					\
-		"cpy %%sr, %1\n"				\
-		"cldst32 %3, %2\n"				\
-		"sne %3, %%sr\n"				\
-		"rli %%sr, 3f; jnz %3, %%sr\n"			\
-		"rli %%sr, 4f; j %%sr\n"			\
-		"2:\n"						\
-		"li %0, %4\n"					\
-		"rli %%sr, 4f; j %%sr\n"			\
-		"3:\n" 						\
-		"li %0, %5\n"					\
-		"4:\n"						\
-		".section __ex_table,\"a\"\n"			\
-		".p2align 1\n"					\
-		".long 1b, 2b\n"				\
-		".previous\n"					\
-		: "=&r" (ret),					\
-		  "=&r" (oldval)				\
-		: "r"   (uaddr),				\
-		  "r"   (oparg),				\
-		  "i"   (-EFAULT),				\
-		  "i"   (-EAGAIN)				\
-		: "%sr")					\
+#define __futex_atomic_op(insn, ret, oldval, uaddr, oparg) \
+	__asm__ __volatile__ ( \
+		"1:\n" \
+		"ld32 %1, %2\n" \
+		insn"\n" \
+		"cpy %%sr, %1\n" \
+		"cldst32 %3, %2\n" \
+		"sne %3, %%sr\n" \
+		"rli %%sr, 3f; jnz %3, %%sr\n" \
+		"rli %%sr, 4f; j %%sr\n" \
+		"2:\n" \
+		"li %0, %4\n" \
+		"rli %%sr, 4f; j %%sr\n" \
+		"3:\n" \
+		"li %0, %5\n" \
+		"4:\n" \
+		".section __ex_table,\"a\"\n" \
+		".p2align 1\n" \
+		".long 1b, 2b\n" \
+		".previous\n" \
+		: "=&r" (ret), \
+		  "=&r" (oldval) \
+		: "r"   (uaddr), \
+		  "r"   (oparg), \
+		  "i"   (-EFAULT), \
+		  "i"   (-EAGAIN) \
+		: "%sr", "memory")
 
 static inline int arch_futex_atomic_op_inuser (
 	int op, u32 oparg, int *oval, u32 __user *uaddr) {
