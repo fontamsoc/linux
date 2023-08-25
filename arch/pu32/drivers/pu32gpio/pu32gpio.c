@@ -198,7 +198,7 @@ static hwdrvdevtbl hwdrvdevtbl_dev = {
 static int __init pu32gpio_init (void) {
 	if (pu32gpio_param_donotuse || !pu32_ishw)
 		return -EIO;
-	devclass = class_create (THIS_MODULE, "pu32gpio");
+	devclass = class_create ("pu32gpio");
 	devclass->dev_uevent = pu32gpio_uevent;
 	unsigned i, j;
 	for (i = 0;; ++i) {
