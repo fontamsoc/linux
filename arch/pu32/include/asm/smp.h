@@ -23,10 +23,8 @@ void arch_send_call_function_single_ipi (int cpu);
 void ipi_init (void);
 
 #ifdef CONFIG_HOTPLUG_CPU
-
 int __cpu_disable (void);
-void __cpu_die (unsigned int cpu);
-
+static inline void __cpu_die(unsigned int cpu) {}
 #endif /* CONFIG_HOTPLUG_CPU */
 
 #endif /* __ASM_PU32_SMP_H */

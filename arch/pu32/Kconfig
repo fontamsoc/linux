@@ -20,6 +20,7 @@ config PU32
 	#select CONTEXT_TRACKING_USER
 	select GENERIC_SMP_IDLE_THREAD
 	select HAVE_IRQ_EXIT_ON_IRQ_STACK
+	select HOTPLUG_CORE_SYNC_DEAD if HOTPLUG_CPU
 
 config SMP
 	def_bool n

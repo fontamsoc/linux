@@ -310,17 +310,13 @@ int __cpu_disable (void) {
 	return 0;
 }
 
-void __cpu_die (unsigned int cpu) {
-	if (!cpu_wait_death(cpu, 5)) {
-		pr_crit("CPU%u shutdown failed\n", cpu);
-		return;
-	}
+void arch_cpuhp_cleanup_dead_cpu (unsigned int cpu) {
 	pr_notice("CPU%u offline\n", cpu);
 }
 
 void __noreturn arch_cpu_idle_dead (void) {
 	idle_task_exit();
-	cpu_report_death();
+	cpuhp_ap_report_dead();
 	asm volatile (
 		"setflags %0\n" ::
 		"r"(PU32_FLAGS_KERNELSPACE | (PU32_FLAGS_disIntr & ~PU32_FLAGS_disExtIntr)) :
