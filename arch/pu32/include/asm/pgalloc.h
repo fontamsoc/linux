@@ -44,6 +44,10 @@ static inline pgd_t *pgd_alloc (
 
 #include <asm-generic/pgalloc.h>
 
-#define __pte_free_tlb(tlb, pte, addr) pte_free((tlb)->mm, pte)
+#define __pte_free_tlb(tlb, pte, addr) \
+do { \
+	pgtable_pte_page_dtor(pte); \
+	tlb_remove_page((tlb), (pte)); \
+} while (0)
 
 #endif /* __ASM_PU32_PGALLOC_H */
