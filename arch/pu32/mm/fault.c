@@ -79,23 +79,9 @@ int do_fault (unsigned long addr, pu32FaultReason faultreason) {
 	int si_code = SEGV_MAPERR;
 
 retry:;
-
-	mmap_read_lock(mm);
-	struct vm_area_struct *vma = find_vma(mm, addr);
+	struct vm_area_struct *vma = lock_mm_and_find_vma(mm, addr, regs);
 	if (!vma)
-		goto bad_area;
-	if (vma->vm_start <= addr)
-		goto good_area;
-	if (!(vma->vm_flags & VM_GROWSDOWN))
-		goto bad_area;
-	if (faulted_in_userspace) {
-		if ((addr + PAGE_SIZE) < regs->sp)
-			goto bad_area;
-	}
-	if (expand_stack(vma, addr))
-		goto bad_area;
-
-good_area:;
+		goto bad_area_nosemaphore;
 
 	si_code = SEGV_ACCERR;
 
@@ -161,9 +147,8 @@ good_area:;
 	goto done;
 
 bad_area:;
-
 	mmap_read_unlock(mm);
-
+bad_area_nosemaphore:;
 	if (faulted_in_userspace) {
 		force_sig_fault(SIGSEGV, si_code, (void *)addr);
 		ret = -1;
