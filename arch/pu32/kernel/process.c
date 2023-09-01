@@ -2,19 +2,9 @@
 // (c) William Fonkou Tambe
 
 #include <linux/ptrace.h>
-#include <linux/preempt.h>
-#include <linux/sched.h>
-#include <linux/sched/signal.h>
-#include <linux/start_kernel.h>
-#include <linux/slab.h>
 
 #include <asm/ptrace.h>
-#include <asm/switch_to.h>
 #include <asm/thread_info.h>
-#include <asm/syscall.h>
-#include <asm/tlbflush.h>
-#include <asm/irq_regs.h>
-#include <asm/irq.h>
 
 #include <pu32.h>
 
@@ -25,15 +15,6 @@ unsigned long pu32_ret_to_kernelspace (struct thread_info *ti) {
 	   because it also checks whether the task is a kernel-thread. */
 	return (ti->ksp < (unsigned long)((struct pu32_pt_regs *)pu32_stack_bottom(ti->ksp)-1));
 }
-
-// Store the task_struct pointer of the task
-// currently running on a CPU.
-// PER_CPU variables are created in section bss,
-// hence this variable will get zeroed.
-// ### This wouldn't be needed if it was possible
-// to use cpu_curr() to retrieve the task_struct
-// currently running on a CPU.
-struct task_struct *pu32_cpu_curr[NR_CPUS];
 
 void pu32_save_syscall_retval (
 	unsigned long syscall_retval) {
@@ -67,8 +48,6 @@ void start_thread (struct pt_regs *regs, unsigned long pc, unsigned long sp) {
 }
 
 // Implemented in kernel/entry.S .
-void ret_from_syscall (void);
-void ret_from_exception (void);
 void ret_from_fork (void);
 void ret_from_kernel_thread (void);
 
@@ -164,135 +143,4 @@ void arch_cpu_idle (void) {
 	raw_local_irq_enable();
 	asm volatile ("halt\n" ::: "memory");
 	raw_local_irq_disable();
-}
-
-int do_fault (unsigned long addr, pu32FaultReason faultreason);
-void do_IRQ (unsigned long irq);
-void pu32_timer_intr (void);
-
-extern unsigned long loops_per_jiffy;
-
-extern unsigned long pu32irqflags[NR_CPUS];
-extern unsigned long pu32hwflags[NR_CPUS];
-
-// Get set to the start of the pu32-kernelmode stack.
-unsigned long pu32_kernelmode_stack[NR_CPUS];
-
-extern unsigned long pu32_ishw;
-
-#include <hwdrvintctrl.h>
-
-#include "sysret.process.c"
-
-// This function is the only piece of code
-// that will execute in pu32-kernelmode after
-// the first use of sysret; it is also where
-// transition between userspace and kernelspace occurs.
-// Within this function, pu32printf() must be
-// used instead of printk() or pr_*() functions.
-// All pu32core must run this function,
-// as it does work common to all cores.
-__attribute__((__noinline__))
-void pu32ctxswitchhdlr (void) {
-	// %sp %fp %rp must be captured before any function call modify them.
-	asm volatile (
-		"setugpr %%sp, %%sp\n"
-		"setugpr %%fp, %%fp\n"
-		"setugpr %%rp, %%rp\n" :::
-		"memory");
-
-	struct thread_info *ti = current_thread_info();
-	struct task_struct *tsk = ti->task;
-
-	pu32_cpu_curr[raw_smp_processor_id()] = tsk;
-
-	raw_local_irq_disable();
-
-	unsigned long hwflags = pu32hwflags[raw_smp_processor_id()];
-	hwflags &= ~PU32_FLAGS_USERSPACE;
-	hwflags |= PU32_FLAGS_KERNELSPACE;
-	pu32hwflags[raw_smp_processor_id()] = hwflags;
-
-	struct mm_struct *mm = tsk->active_mm;
-	asm volatile (
-		"setugpr %%tp, %%tp\n"
-		"cpy %%sr, %1\n"
-		"setasid %0\n"
-		"setflags %2\n"
-		"li8 %%sr, 0\n"
-		"setugpr %%1, %%sr\n" // pu32sysret(0)
-		"setuip %3\n" ::
-		"r"(mm->context),
-		"r"(mm->pgd),
-		"r"(hwflags),
-		"r"(pu32sysret) :
-		"memory");
-
-	/* Set up a different stack to be used by this function so that
-	it does not corrupt the stack of the task running in pu32-usermode.
-	In other words, we are setting up the stack to be used in pu32-kernelmode. */ {
-		unsigned long osp; asm volatile ("cpy %0, %%sp\n" : "=r"(osp));
-		unsigned long ofp; asm volatile ("cpy %0, %%fp\n" : "=r"(ofp));
-		unsigned long kmode_stack = (unsigned long)kmalloc(THREAD_SIZE, GFP_ATOMIC);
-		pu32_kernelmode_stack[raw_smp_processor_id()] = kmode_stack;
-		unsigned long pu32_stack_top_osp = pu32_stack_top(osp);
-		unsigned long o = (osp - pu32_stack_top_osp);
-		unsigned long nsp = kmode_stack + o;
-		memcpy((void *)nsp, (void *)osp, (THREAD_SIZE - o));
-		pu32_get_thread_info(nsp)->ksp -= (pu32_stack_top_osp - kmode_stack);
-		asm volatile ("cpy %%sp, %0\n" :: "r"(nsp));
-		asm volatile ("cpy %%fp, %0\n" :: "r"(kmode_stack + (ofp - pu32_stack_top_osp)));
-	}
-
-	local_flush_tlb_all();
-
-	if (pu32_ishw) // Enable core to receive device interrupts.
-		hwdrvintctrl_ack(raw_smp_processor_id(), 1);
-
-	pu32sysret(1);
-}
-
-// Linux declares arch_call_rest_init() with
-// the attribute __init, which means the memory
-// that it occupies lives between __init_begin
-// and __init_end and gets freed.
-__attribute__((optimize("O0"))) // used otherwise for some reason entire function is not compiled.
-void __init arch_call_rest_init (void) {
-	void add_pte (unsigned long addr, unsigned long prot) {
-		pgd_t *pgd = swapper_pg_dir + pgd_index(addr);
-		pmd_t *pmd = pmd_offset((pud_t *)pgd, addr); // There is no pmd; this does pmd = pgd.
-		if (pmd_present(*pmd)) {
-			pte_t pte = *pte_offset_map(pmd, addr);
-			if (pte_present(pte)) // The mapping must not already exist.
-				panic("add_pte: invalid pgd: pte already exist: 0x%x\n",
-					(unsigned)pte_val(pte));
-		} else
-			(void)pte_alloc(&init_mm, pmd);
-		set_pte_at(
-			&init_mm, addr,
-			pte_offset_map(pmd, addr),
-			__pte((addr & PAGE_MASK) | prot));
-	}
-	add_pte(0, _PAGE_PRESENT | _PAGE_READABLE | _PAGE_WRITABLE);
-	extern char __pu32tramp_start[], __pu32tramp_end[];
-	for (
-		unsigned long addr = (unsigned long)__pu32tramp_start;
-		addr < (unsigned long)__pu32tramp_end;
-		addr += PAGE_SIZE) {
-		add_pte(addr, _PAGE_PRESENT | _PAGE_USER | _PAGE_CACHED | _PAGE_EXECUTABLE);
-	}
-	#if 0
-	// ### Since setksl is used, these are no longer needed, but kept for future reference.
-	for (addr = (unsigned long)_text; addr < (unsigned long)_etext; addr += PAGE_SIZE)
-		add_pte(addr,
-			((addr >= (unsigned long)__pu32tramp_start && addr < (unsigned long)__pu32tramp_end) ?
-				_PAGE_USER : 0) | _PAGE_PRESENT | _PAGE_EXECUTABLE);
-	for (addr = (unsigned long)__start_rodata; addr < (unsigned long)__end_rodata; addr += PAGE_SIZE)
-		add_pte(addr, _PAGE_PRESENT | _PAGE_READABLE);
-	extern char __start_rwdata[], __end_rwdata[];
-	for (addr = (unsigned long)__start_rwdata; addr < (unsigned long)__end_rwdata; addr += PAGE_SIZE)
-		add_pte(addr, _PAGE_PRESENT | _PAGE_READABLE | _PAGE_WRITABLE);
-	#endif
-	pu32ctxswitchhdlr();
-	rest_init();
 }
