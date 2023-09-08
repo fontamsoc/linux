@@ -1006,7 +1006,7 @@ void pu32ctxswitchhdlr (void) {
 __attribute__((optimize("O0"))) // used otherwise for some reason entire function is not compiled.
 void __init arch_call_rest_init (void) {
 	void add_pte (unsigned long addr, unsigned long prot) {
-		pgd_t *pgd = swapper_pg_dir + pgd_index(addr);
+		pgd_t *pgd = init_mm.pgd + pgd_index(addr);
 		pmd_t *pmd = pmd_offset((pud_t *)pgd, addr); // There is no pmd; this does pmd = pgd.
 		if (pmd_present(*pmd)) {
 			pte_t pte = *pte_offset_map(pmd, addr);

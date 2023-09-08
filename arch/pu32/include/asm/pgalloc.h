@@ -20,24 +20,9 @@ static inline void pmd_populate (
 
 static inline pgd_t *pgd_alloc (
 	struct mm_struct *mm) {
-	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_ATOMIC);
+	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
 	if (pgd != NULL) {
-		pgd[0] = swapper_pg_dir[0];
-		extern char __pu32tramp_start[], __pu32tramp_end[];
-		unsigned long addr = (unsigned long)__pu32tramp_start;
-		unsigned long pgd_idx = pgd_index(addr);
-		if (pgd_idx > 0)
-			memset (pgd+1, 0, ((pgd_idx-1) * sizeof(pgd_t)));
-		// Copy trampoline mappings which are part of kernel mappings.
-		// 1-to-1 mapping is always done in kernelspace regardless of TLB entries;
-		// hence trampoline mappings, which are used in userspace,
-		// are the only kernel mappings that needs to be copied.
-		for (; addr < (unsigned long)__pu32tramp_end; addr += PGDIR_SIZE) {
-			unsigned long addr_pgd_index = pgd_index(addr);
-			pgd[addr_pgd_index] = swapper_pg_dir[addr_pgd_index];
-		}
-		memset (pgd + pgd_index(addr), 0,
-			((PTRS_PER_PGD - pgd_index(addr)) * sizeof(pgd_t)));
+		memcpy(pgd, init_mm.pgd, PTRS_PER_PGD*sizeof(pgd_t));
 	}
 	return pgd;
 }
