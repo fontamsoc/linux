@@ -742,6 +742,14 @@ static void pu32sysrethdlr_extIntr (unsigned long sysopcode) {
 
 	unsigned long irqsrc = pu32_irq_ack(1);
 	if (irqsrc != -1) {
+		struct mm_struct *mm = tsk->active_mm;
+		unsigned long asid = (mm->context|(1<<13));
+		asm volatile ( // Enable kmode paging for vmalloc area.
+			"cpy %%sr, %1\n"
+			"setasid %0\n" ::
+			"r"(asid),
+			"r"(mm->pgd) :
+			"memory");
 		do_IRQ(irqsrc);
 	}
 
@@ -767,6 +775,18 @@ static void pu32sysrethdlr_extIntr (unsigned long sysopcode) {
 			"r"(mm->pgd) :
 			"memory");
 		asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
+
+	} else {
+
+		unsigned long ti_in_userspace = pu32_in_userspace(ti);
+		struct mm_struct *mm = tsk->active_mm;
+		unsigned long asid = (mm->context|(ti_in_userspace<<12));
+		asm volatile (
+			"cpy %%sr, %1\n"
+			"setasid %0\n" ::
+			"r"(asid),
+			"r"(mm->pgd) :
+			"memory");
 	}
 }
 
@@ -786,7 +806,17 @@ static void pu32sysrethdlr_timerIntr (unsigned long sysopcode) {
 	}
 	#endif
 
-	pu32_timer_intr();
+	{
+		struct mm_struct *mm = tsk->active_mm;
+		unsigned long asid = (mm->context|(1<<13));
+		asm volatile ( // Enable kmode paging for vmalloc area.
+			"cpy %%sr, %1\n"
+			"setasid %0\n" ::
+			"r"(asid),
+			"r"(mm->pgd) :
+			"memory");
+		pu32_timer_intr();
+	}
 
 	if (ti->preempt_count == PREEMPT_ENABLED && (ti->flags&_TIF_WORK_MASK)) {
 
@@ -810,6 +840,18 @@ static void pu32sysrethdlr_timerIntr (unsigned long sysopcode) {
 			"r"(mm->pgd) :
 			"memory");
 		asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
+
+	} else {
+
+		unsigned long ti_in_userspace = pu32_in_userspace(ti);
+		struct mm_struct *mm = tsk->active_mm;
+		unsigned long asid = (mm->context|(ti_in_userspace<<12));
+		asm volatile (
+			"cpy %%sr, %1\n"
+			"setasid %0\n" ::
+			"r"(asid),
+			"r"(mm->pgd) :
+			"memory");
 	}
 }
 
