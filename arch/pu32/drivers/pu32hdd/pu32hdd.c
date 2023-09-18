@@ -159,17 +159,17 @@ static blk_status_t pu32hdd_queue_rq (
 	struct blk_mq_hw_ctx *hctx,
 	const struct blk_mq_queue_data* bd) {
 	struct request *rq = bd->rq;
-	//struct pu32hdd_device *dev = rq->q->queuedata;
-	//if (!spin_trylock (&dev->lock))
-	//	return BLK_STS_DEV_RESOURCE;
+	struct pu32hdd_device *dev = rq->q->queuedata;
+	if (!spin_trylock (&dev->lock))
+		return BLK_STS_DEV_RESOURCE;
 	blk_status_t status = BLK_STS_OK;
 	blk_mq_start_request(rq);
 	do {
 		status = pu32hdd_do_request(rq);
 	} while (blk_update_request(rq, status, blk_rq_cur_bytes(rq)));
 	__blk_mq_end_request (rq, status);
-	//spin_unlock (&dev->lock);
-	return status;
+	spin_unlock (&dev->lock);
+	return BLK_STS_OK;
 }
 
 static struct blk_mq_ops pu32hdd_mq_ops = {
@@ -262,8 +262,11 @@ static int __init pu32hdd_init (void) {
 	blk_queue_logical_block_size (pu32hdd_dev.gd->queue, SECTOR_SIZE);
 	blk_queue_physical_block_size (pu32hdd_dev.gd->queue, SECTOR_SIZE);
 	set_capacity(pu32hdd_dev.gd, pu32hdd_dev.capacity);
-	add_disk(pu32hdd_dev.gd);
+	if (add_disk(pu32hdd_dev.gd))
+		goto out_put_disk;
 	return 0;
+	out_put_disk:
+	put_disk(pu32hdd_dev.gd);
 	out_unregister_blkdev:
 	unregister_blkdev (major_num, "hd");
 	out:
