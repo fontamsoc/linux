@@ -41,11 +41,9 @@ struct thread_info {
 	/* To be used before save_pu32umode_regs() or after restore_pu32umode_regs() */ \
 	(ti->ksp == pu32_stack_bottom(ti->ksp)); })
 #define pu32_ret_to_userspace(ti) \
-	/* To be used after save_pu32umode_regs() or before restore_pu32umode_regs().
-	   This function must be used instead of (!pu32_ret_to_kernelspace()),
-	   because it also checks whether the task is a kernel-thread. */ \
+	/* To be used after save_pu32umode_regs() or before restore_pu32umode_regs() */ \
 	(!((ti)->task->flags&(PF_KTHREAD | PF_IO_WORKER)) && \
-		((ti)->ksp == (unsigned long)((struct pu32_pt_regs *)pu32_stack_bottom((ti)->ksp)-1)))
+		((ti)->ksp >= (unsigned long)((struct pu32_pt_regs *)pu32_stack_bottom((ti)->ksp)-1)))
 // setup_thread_stack() does not set ti->ksp (if kernel-thread),
 // ti->kr1, ti->kpc, as they are set by copy_thread().
 #define setup_thread_stack(tsk, orig)  {					\

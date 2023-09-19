@@ -100,8 +100,7 @@ void show_stack (struct task_struct *tsk, unsigned long *sp, const char *loglvl)
 			pu32sysopcodestr (sysopcode));
 		printk ("%sstacktrace(kmode):\n", loglvl);
 		stacktrace (sp, (unsigned long *)pu32_stack_bottom(sp), loglvl);
-		unsigned long pu32_ret_to_kernelspace (struct thread_info *ti);
-		if (is_current_ti && (iskthread || pu32_ret_to_kernelspace(ti))) {
+		if (is_current_ti && !user_mode(pu32_ti_pt_regs(ti))) {
 			asm volatile ("setkgpr %0, %%sp\n" : "=r"(sp) :: "memory");
 			if (pu32_stack_top(sp) != pu32_stack_top(ksp)) {
 				printk ("%s!!! stack_top(sp(0x%x)) != stack_top(ksp(0x%x)) !!!\n",

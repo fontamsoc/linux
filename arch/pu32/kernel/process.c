@@ -9,11 +9,7 @@
 #include <pu32.h>
 
 unsigned long pu32_ret_to_kernelspace (struct thread_info *ti) {
-	/* To be used after save_pu32umode_regs() or before restore_pu32umode_regs().
-	   When checking whether the task returns to userspace,
-	   pu32_ret_to_userspace() must be used instead of (!pu32_ret_to_kernelspace()),
-	   because it also checks whether the task is a kernel-thread. */
-	return (ti->ksp < (unsigned long)((struct pu32_pt_regs *)pu32_stack_bottom(ti->ksp)-1));
+	return !pu32_ret_to_userspace(ti);
 }
 
 void pu32_save_syscall_retval (
