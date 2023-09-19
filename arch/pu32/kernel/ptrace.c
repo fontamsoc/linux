@@ -87,6 +87,17 @@ void show_stack (struct task_struct *tsk, unsigned long *sp, const char *loglvl)
 	}
 	asm volatile ("cpy %0, %%sp\n" : "=r"(sp) :: "memory");
 	if (pu32_stack_top(sp) == pu32_kernelmode_stack[raw_smp_processor_id()]) {
+		pu32FaultReason faultreason;
+		unsigned long sysopcode;
+		asm volatile (
+			"getfaultreason %0\n"
+			"getsysopcode %1\n" :
+			"=r"(faultreason),
+			"=r"(sysopcode) ::
+			"memory");
+		printk ("%s%s: %s\n", loglvl,
+			pu32faultreasonstr (faultreason, 0),
+			pu32sysopcodestr (sysopcode));
 		printk ("%sstacktrace(kmode):\n", loglvl);
 		stacktrace (sp, (unsigned long *)pu32_stack_bottom(sp), loglvl);
 		unsigned long pu32_ret_to_kernelspace (struct thread_info *ti);
