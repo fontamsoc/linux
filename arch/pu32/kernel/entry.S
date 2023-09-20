@@ -10,6 +10,10 @@
 
 __REF
 
+GLOBAL(ret_from_fault)
+	rli %sr, pu32_local_irq_disable
+	rli %rp, ret_from_exception
+	j %sr
 GLOBAL(ret_from_syscall)
 	# %1 has syscall return value.
 	rli %sr, pu32_save_syscall_retval
@@ -35,7 +39,7 @@ GLOBAL(ret_from_exception)
 	rli %sr, 0f
 	jz %2, %sr
 	rli %sr, schedule
-	rli %rp, ret_from_exception
+	rli %rp, ret_from_fault
 	j %sr
 	0: # Handle (_TIF_SIGPENDING | _TIF_NOTIFY_RESUME).
 	# %1 has thread_info.flags.
@@ -43,7 +47,7 @@ GLOBAL(ret_from_exception)
 	rli %rp, sysret
 	j %sr
 resume_kernel:
-	#ifdef CONFIG_PREEMPTION
+#ifdef CONFIG_PREEMPTION
 	CURRENT_THREAD_INFO(%1)
 	inc %1, TASK_TI_PREEMPT_COUNT
 	ld32 %1, %1
@@ -63,9 +67,8 @@ resume_kernel:
 	rli %sr, sysret
 	jz %1, %sr # sysret if irq enabled.
 	rli %sr, preempt_schedule_irq
-	rli %rp, ret_from_exception
-	j %sr
-	#endif
+	jl %rp, %sr
+#endif
 sysret:
 	CURRENT_THREAD_INFO(%2)
 	inc %2, TASK_TI_TASK
@@ -77,7 +80,7 @@ sysret:
 GLOBAL(ret_from_fork)
 	# %1 is expected to have struct task_struct *prev.
 	rli %sr, schedule_tail
-	rli %rp, ret_from_exception
+	rli %rp, ret_from_fault
 	j %sr
 
 GLOBAL(ret_from_kernel_thread)
@@ -92,7 +95,7 @@ GLOBAL(ret_from_kernel_thread)
 	ld32 %sr, %sr
 	inc %1, TASK_TI_KR1
 	ld32 %1, %1
-	rli %rp, ret_from_exception
+	rli %rp, ret_from_fault
 	j %sr
 
 GLOBAL(__switch_to)
