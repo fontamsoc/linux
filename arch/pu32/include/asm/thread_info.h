@@ -31,7 +31,7 @@ struct thread_info {
 #define __HAVE_THREAD_FUNCTIONS
 #define task_stack_page(tsk)		((void *)(tsk)->stack)
 #define PU32_TI_OFFSET			(THREAD_SIZE - sizeof(struct thread_info))
-#define pu32_stack_top(sp)		((unsigned long)sp & ~(THREAD_SIZE - 1))
+#define pu32_stack_top(sp)		((unsigned long)(sp) & ~(THREAD_SIZE - 1))
 // pu32_stack_bottom() takes into account the location used by set_task_stack_end_magic().
 #define pu32_stack_bottom(sp)		(pu32_stack_top(sp) + (PU32_TI_OFFSET - __SIZEOF_POINTER__))
 #define end_of_stack(tsk)		((long unsigned *)pu32_stack_bottom(task_stack_page(tsk)))

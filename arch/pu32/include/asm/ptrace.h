@@ -13,7 +13,7 @@ extern unsigned long pu32_kernelmode_stack[NR_CPUS];
 
 #define user_mode(regs) ({ \
 	unsigned long sp; asm volatile ("cpy %0, %%sp\n" : "=r"(sp) :: "memory"); \
-	(((sp & ~(THREAD_SIZE-1)) == pu32_kernelmode_stack[raw_smp_processor_id()]) ? \
+	((pu32_stack_top(sp) == pu32_kernelmode_stack[raw_smp_processor_id()]) ? \
 		pu32_in_userspace(current_thread_info()) : \
 		pu32_ret_to_userspace(current_thread_info()));})
 #define user_stack_pointer(regs) ({ \
