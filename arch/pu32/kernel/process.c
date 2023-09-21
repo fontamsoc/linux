@@ -8,19 +8,6 @@
 
 #include <pu32.h>
 
-unsigned long pu32_ret_to_kernelspace (struct thread_info *ti) {
-	return !pu32_ret_to_userspace(ti);
-}
-
-void pu32_save_syscall_retval (
-	unsigned long syscall_retval) {
-	struct thread_info *ti = current_thread_info();
-	pu32_ti_pt_regs(ti)->regs.r1 = syscall_retval;
-	if (test_thread_flag(TIF_SYSCALL_TRACE))
-		ptrace_report_syscall_exit(&pu32_tsk_pt_regs(current)->regs, 0);
-	return;
-}
-
 // Start a new user thread.
 // This function is called after loading a user
 // executable (elf, aout, etc.) to setup a code

@@ -38,6 +38,19 @@ struct task_struct *pu32_cpu_curr[NR_CPUS];
 
 extern unsigned long pu32_ishw;
 
+unsigned long pu32_ret_to_kernelspace (struct thread_info *ti) {
+	return !pu32_ret_to_userspace(ti);
+}
+
+void pu32_save_syscall_retval (
+	unsigned long syscall_retval) {
+	struct thread_info *ti = current_thread_info();
+	pu32_ti_pt_regs(ti)->regs.r1 = syscall_retval;
+	if (test_thread_flag(TIF_SYSCALL_TRACE))
+		ptrace_report_syscall_exit(&pu32_tsk_pt_regs(current)->regs, 0);
+	return;
+}
+
 // Implemented in kernel/entry.S .
 void ret_from_syscall (void);
 void ret_from_exception (void);
