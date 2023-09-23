@@ -1011,6 +1011,11 @@ void pu32ctxswitchhdlr (void) {
 		"setugpr %%rp, %%rp\n" :::
 		"memory");
 
+	unsigned long pucap;
+	asm volatile ("getcap %0\n" : "=r"(pucap) :: "memory");
+	if (!(pucap & PU32_CAP_mmu))
+		panic("CPU%u missing MMU\n", raw_smp_processor_id());
+
 	struct thread_info *ti = current_thread_info();
 	struct task_struct *tsk = ti->task;
 
