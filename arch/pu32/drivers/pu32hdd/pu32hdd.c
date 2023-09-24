@@ -79,7 +79,7 @@ extern unsigned long pu32_ishw;
 
 // Internal representation of device.
 static struct pu32hdd_device {
-	unsigned long capacity;
+	loff_t capacity;
 	struct gendisk *gd;
 	struct blk_mq_tag_set tag_set;
 	spinlock_t lock;
