@@ -17,7 +17,8 @@
 int do_fault (unsigned long addr, pu32FaultReason faultreason) {
 
 	struct task_struct *tsk = current;
-	struct pt_regs *regs = &pu32_tsk_pt_regs(tsk)->regs;
+	struct pu32_pt_regs *tsk_pt_regs = pu32_tsk_pt_regs(tsk);
+	struct pt_regs *regs = &tsk_pt_regs->regs;
 	struct thread_info *ti = task_thread_info(tsk);
 
 	ti->in_fault = 1;
@@ -35,7 +36,10 @@ int do_fault (unsigned long addr, pu32FaultReason faultreason) {
 		case pu32SysOpIntr:
 			if (!faulted_in_userspace)
 				goto exception;
-			force_sig_fault(SIGILL, ILL_ILLOPC, (void *)addr);
+			if ((tsk_pt_regs->sysopcode&0xff) == 0x02)
+				force_sig_fault(SIGTRAP, TRAP_BRKPT, (void *)addr);
+			else
+				force_sig_fault(SIGILL, ILL_ILLOPC, (void *)addr);
 			ret = -1;
 			goto done;
 		case pu32AlignFaultIntr:
