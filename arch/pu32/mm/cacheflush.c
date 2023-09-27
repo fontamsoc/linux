@@ -24,5 +24,6 @@ void update_mmu_cache (struct vm_area_struct *vma, unsigned long addr, pte_t *pt
 			(pte_val_pte&_PAGE_EXECUTABLE) ?
 				(_PAGE_READABLE | _PAGE_WRITABLE) :
 				_PAGE_EXECUTABLE)),
-			"r"((addr&PAGE_MASK)|vma->vm_mm->context) : "memory");
+			"r"((addr&PAGE_MASK)|vma->vm_mm->context[raw_smp_processor_id()])
+		: "memory");
 }

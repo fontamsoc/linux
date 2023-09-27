@@ -227,7 +227,8 @@ vmalloc_fault:;
 			(faultreason == pu32ExecFaultIntr) ?
 				(_PAGE_READABLE | _PAGE_WRITABLE) :
 				_PAGE_EXECUTABLE)),
-			"r"((addr&PAGE_MASK)|active_mm->context) : "memory");
+			"r"((addr&PAGE_MASK)|active_mm->context[raw_smp_processor_id()])
+		: "memory");
 
 	ret = 1;
 

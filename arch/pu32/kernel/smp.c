@@ -218,6 +218,8 @@ static irqreturn_t handle_ipi (int irq, void *dev) {
 }
 
 static void ipi_msg (const struct cpumask *mask, enum ipi_msg_type msg_id) {
+	unsigned long flags;
+	local_irq_save(flags);
 	unsigned int cpu;
 	for_each_cpu(cpu, mask)
 		__set_bit(msg_id, &ipi_data[cpu].bits);
@@ -230,6 +232,7 @@ static void ipi_msg (const struct cpumask *mask, enum ipi_msg_type msg_id) {
 		if (irqdst == -1)
 			pr_crit("CPU%u ipi_msg failed\n", cpu);
 	}
+	local_irq_restore(flags);
 }
 
 static const char * const ipi_names[] = {
@@ -241,7 +244,7 @@ static const char * const ipi_names[] = {
 	#endif
 };
 
-int arch_show_interrupts(struct seq_file *p, int prec) {
+int arch_show_interrupts (struct seq_file *p, int prec) {
 	unsigned int cpu, i;
 	for (i = 0; i < IPI_MAX; i++) {
 		if (!ipi_names[i])

@@ -393,7 +393,7 @@ static void pu32sysrethdlr_sysOpIntr (unsigned long sysopcode) {
 				asm volatile (
 					"cpy %%sr, %1\n"
 					"setasid %0\n" ::
-					"r"(mm->context),
+					"r"(mm->context[raw_smp_processor_id()]),
 					"r"(mm->pgd) :
 					"memory");
 				asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
@@ -466,7 +466,9 @@ static void pu32sysrethdlr_sysOpIntr (unsigned long sysopcode) {
 						asm volatile ("setugpr %%tp, %0\n" :: "r"(next_ti) : "memory");
 
 					struct mm_struct *next_mm = next->active_mm;
-					unsigned long asid = (next_mm->context|(next_ti_in_userspace<<12));
+					unsigned long asid = (
+						next_mm->context[raw_smp_processor_id()] |
+						(next_ti_in_userspace<<12));
 
 					unsigned long hwflags = pu32hwflags[raw_smp_processor_id()];
 					if (prev || !next_ti_in_userspace) {
@@ -481,8 +483,9 @@ static void pu32sysrethdlr_sysOpIntr (unsigned long sysopcode) {
 
 					#ifdef CONFIG_SMP
 					if (next_ti->last_cpu != raw_smp_processor_id()) {
-						local_flush_tlb_mm(next_mm);
 						next_ti->last_cpu = raw_smp_processor_id();
+						smp_mb();
+						local_flush_tlb_mm(next_mm);
 					}
 					#endif
 
@@ -601,7 +604,7 @@ static void pu32sysrethdlr_sysOpIntr (unsigned long sysopcode) {
 			asm volatile (
 				"cpy %%sr, %1\n"
 				"setasid %0\n" ::
-				"r"(mm->context),
+				"r"(mm->context[raw_smp_processor_id()]),
 				"r"(mm->pgd) :
 				"memory");
 			asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
@@ -648,7 +651,7 @@ static void pu32sysrethdlr_faultIntr (pu32FaultReason faultreason, unsigned long
 					(faultreason == pu32ExecFaultIntr) ?
 						(_PAGE_READABLE | _PAGE_WRITABLE) :
 						_PAGE_EXECUTABLE));
-				tlbentry.d2 = ((faultaddr&PAGE_MASK)|mm->context);
+				tlbentry.d2 = ((faultaddr&PAGE_MASK)|mm->context[raw_smp_processor_id()]);
 				out: return tlbentry;
 			}
 			struct pu32tlbentry tlbentry = walk_page_table();
@@ -707,7 +710,7 @@ static void pu32sysrethdlr_faultIntr (pu32FaultReason faultreason, unsigned long
 	asm volatile (
 		"cpy %%sr, %1\n"
 		"setasid %0\n" ::
-		"r"(mm->context),
+		"r"(mm->context[raw_smp_processor_id()]),
 		"r"(mm->pgd) :
 		"memory");
 	asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
@@ -761,7 +764,7 @@ static void pu32sysrethdlr_extIntr (unsigned long sysopcode) {
 	unsigned long irqsrc = pu32_irq_ack(1);
 	if (irqsrc != -1) {
 		struct mm_struct *mm = tsk->active_mm;
-		unsigned long asid = (mm->context|(1<<13));
+		unsigned long asid = (mm->context[raw_smp_processor_id()]|(1<<13));
 		asm volatile ( // Enable kmode paging for vmalloc area.
 			"cpy %%sr, %1\n"
 			"setasid %0\n" ::
@@ -790,7 +793,7 @@ static void pu32sysrethdlr_extIntr (unsigned long sysopcode) {
 		asm volatile (
 			"cpy %%sr, %1\n"
 			"setasid %0\n" ::
-			"r"(mm->context),
+			"r"(mm->context[raw_smp_processor_id()]),
 			"r"(mm->pgd) :
 			"memory");
 		asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
@@ -799,7 +802,7 @@ static void pu32sysrethdlr_extIntr (unsigned long sysopcode) {
 
 		unsigned long ti_in_userspace = pu32_in_userspace(ti);
 		struct mm_struct *mm = tsk->active_mm;
-		unsigned long asid = (mm->context|(ti_in_userspace<<12));
+		unsigned long asid = (mm->context[raw_smp_processor_id()]|(ti_in_userspace<<12));
 		asm volatile (
 			"cpy %%sr, %1\n"
 			"setasid %0\n" ::
@@ -827,7 +830,7 @@ static void pu32sysrethdlr_timerIntr (unsigned long sysopcode) {
 
 	{
 		struct mm_struct *mm = tsk->active_mm;
-		unsigned long asid = (mm->context|(1<<13));
+		unsigned long asid = (mm->context[raw_smp_processor_id()]|(1<<13));
 		asm volatile ( // Enable kmode paging for vmalloc area.
 			"cpy %%sr, %1\n"
 			"setasid %0\n" ::
@@ -856,7 +859,7 @@ static void pu32sysrethdlr_timerIntr (unsigned long sysopcode) {
 		asm volatile (
 			"cpy %%sr, %1\n"
 			"setasid %0\n" ::
-			"r"(mm->context),
+			"r"(mm->context[raw_smp_processor_id()]),
 			"r"(mm->pgd) :
 			"memory");
 		asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
@@ -865,7 +868,7 @@ static void pu32sysrethdlr_timerIntr (unsigned long sysopcode) {
 
 		unsigned long ti_in_userspace = pu32_in_userspace(ti);
 		struct mm_struct *mm = tsk->active_mm;
-		unsigned long asid = (mm->context|(ti_in_userspace<<12));
+		unsigned long asid = (mm->context[raw_smp_processor_id()]|(ti_in_userspace<<12));
 		asm volatile (
 			"cpy %%sr, %1\n"
 			"setasid %0\n" ::
@@ -911,7 +914,7 @@ static void pu32sysrethdlr_preemptIntr (unsigned long sysopcode) {
 		asm volatile (
 			"cpy %%sr, %1\n"
 			"setasid %0\n" ::
-			"r"(mm->context),
+			"r"(mm->context[raw_smp_processor_id()]),
 			"r"(mm->pgd) :
 			"memory");
 		asm volatile ("setflags %0\n" :: "r"(hwflags) : "memory");
@@ -1036,7 +1039,7 @@ void pu32ctxswitchhdlr (void) {
 		"li8 %%sr, 0\n"
 		"setugpr %%1, %%sr\n" // pu32sysret(0)
 		"setuip %3\n" ::
-		"r"(mm->context),
+		"r"(mm->context[raw_smp_processor_id()]),
 		"r"(mm->pgd),
 		"r"(hwflags),
 		"r"(pu32sysret) :

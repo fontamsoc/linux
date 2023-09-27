@@ -42,7 +42,7 @@ static inline unsigned long pu32_tlb_size (void) {
 }
 
 static inline unsigned long pu32_tlb_lookup (unsigned long addr) {
-	unsigned long d = ((addr & PAGE_MASK) | current->active_mm->context);
+	unsigned long d = ((addr & PAGE_MASK) | current->active_mm->context[raw_smp_processor_id()]);
 	asm volatile ("gettlb %0, %0\n" : "+r"(d) :: "memory");
 	return d;
 }
@@ -53,7 +53,7 @@ static inline void pu32_tlb_update (struct pu32tlbentry tlbentry) {
 
 static inline void local_flush_tlb_page (
 	struct vm_area_struct *vma, unsigned long addr) {
-	unsigned long d = ((addr & PAGE_MASK) | current->active_mm->context);
+	unsigned long d = ((addr & PAGE_MASK) | current->active_mm->context[raw_smp_processor_id()]);
 	asm volatile ("clrtlb %0, %1\n" :: "r"(-1), "r"(d) : "memory");
 }
 
@@ -73,7 +73,7 @@ static inline void local_flush_tlb_range (
 	unsigned long flags;
 	local_irq_save(flags);
 	for (start &= PAGE_MASK; start < end; start += PAGE_SIZE) {
-		unsigned long d = (start | current->active_mm->context);
+		unsigned long d = (start | current->active_mm->context[raw_smp_processor_id()]);
 		asm volatile ("clrtlb %0, %1\n" :: "r"(-1), "r"(d) : "memory");
 	}
 	local_irq_restore(flags);
@@ -82,19 +82,18 @@ static inline void local_flush_tlb_range (
 static inline void local_flush_tlb_mm (struct mm_struct *mm) {
 	unsigned long flags;
 	local_irq_save(flags);
-	unsigned long context = mm->context;
+	unsigned long context = mm->context[raw_smp_processor_id()];
 	unsigned long sz = (pu32_tlb_size() << PAGE_SHIFT);
 	do asm volatile ("clrtlb %0, %1\n" :: "r"(PAGE_SIZE-1), "r"((sz -= PAGE_SIZE) | context) : "memory");
 		while (sz);
 	local_irq_restore(flags);
 }
 
-#define flush_tlb_all			local_flush_tlb_all
-#define flush_tlb_mm			local_flush_tlb_mm
-#define flush_tlb_range			local_flush_tlb_range
-#define flush_tlb_page			local_flush_tlb_page
-#define flush_tlb_kernel_range(s,e)	local_flush_tlb_range(((struct vm_area_struct *){0}), s, e)
-#define flush_tlb_kernel_page(a)	local_flush_tlb_page(((struct vm_area_struct *){0}), a)
+#define flush_tlb_all               local_flush_tlb_all
+#define flush_tlb_mm                local_flush_tlb_mm
+#define flush_tlb_range             local_flush_tlb_range
+#define flush_tlb_page              local_flush_tlb_page
+#define flush_tlb_kernel_range(s,e) local_flush_tlb_range(((struct vm_area_struct *){0}), s, e)
 
 #endif
 

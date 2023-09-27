@@ -13,9 +13,10 @@
 #define enter_lazy_tlb(mm, tsk) do {} while (0)
 
 static inline int init_new_context (
-	struct task_struct *task,
-	struct mm_struct *mm) {
-	mm->context = PU32_NO_CONTEXT;
+	struct task_struct *task, struct mm_struct *mm) {
+	int i;
+	for_each_possible_cpu(i)
+		mm->context[i] = PU32_NO_CONTEXT;
 	return 0;
 }
 
@@ -27,17 +28,20 @@ static inline void switch_mm (
 	unsigned long flags;
 	local_irq_save(flags);
 
-	unsigned long context = next->context;
+	smp_mb();
+
+	unsigned long context = next->context[raw_smp_processor_id()];
 	if (context != PU32_NO_CONTEXT)
 		goto done;
 
 	context = get_mmu_context();
 	if (context != PU32_NO_CONTEXT)
-		next->context = context;
+		next->context[raw_smp_processor_id()] = context;
+
+	done:
 
 	local_flush_tlb_mm(next);
 
-	done:
 	asm volatile (
 		"cpy %%sr, %1\n"
 		"setasid %0\n" ::
@@ -52,16 +56,21 @@ static inline void switch_mm (
 
 static inline void deactivate_mm (struct task_struct *tsk, struct mm_struct *mm) {}
 
-void put_mmu_context (unsigned long context);
+void put_mmu_context (unsigned long context, unsigned long cpu);
 
 static inline void destroy_context (struct mm_struct *mm) {
 
 	unsigned long flags;
 	local_irq_save(flags);
 
-	unsigned long context = mm->context;
-	if (context != PU32_NO_CONTEXT)
-		put_mmu_context(context);
+	int i;
+	for_each_possible_cpu(i) {
+		unsigned long context = mm->context[i];
+		if (context != PU32_NO_CONTEXT)
+			put_mmu_context(context, i);
+	}
+
+	smp_mb();
 
 	local_irq_restore(flags);
 }
