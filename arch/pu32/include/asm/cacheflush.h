@@ -43,16 +43,14 @@ static inline void flush_icache_range (unsigned long start, unsigned long end) {
 
 static inline void flush_icache_page (
 	struct vm_area_struct *vma, struct page *page) {
-	if (vma->vm_flags & VM_EXEC)
-		asm volatile ("icacherst\n" ::: "memory");
+	asm volatile ("icacherst\n" ::: "memory");
 }
 #define flush_icache_page flush_icache_page
 
 static inline void flush_icache_user_page (
 	struct vm_area_struct *vma, struct page *page,
 	unsigned long addr, int len) {
-	if (vma->vm_flags & VM_EXEC)
-		asm volatile ("icacherst\n" ::: "memory");
+	asm volatile ("icacherst\n" ::: "memory");
 }
 #define flush_icache_user_page flush_icache_user_page
 
