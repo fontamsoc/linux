@@ -59,11 +59,11 @@ static inline void local_flush_tlb_page (
 
 static inline void local_flush_tlb_all (void) {
 	unsigned long flags;
-	raw_local_irq_save(flags);
+	local_irq_save(flags);
 	unsigned long sz = (pu32_tlb_size() << PAGE_SHIFT);
 	do asm volatile ("clrtlb %0, %1\n" :: "r"(0), "r"(sz -= PAGE_SIZE) : "memory");
 		while (sz);
-	raw_local_irq_restore(flags);
+	local_irq_restore(flags);
 }
 
 static inline void local_flush_tlb_range (
@@ -71,22 +71,22 @@ static inline void local_flush_tlb_range (
 	unsigned long start,
 	unsigned long end) {
 	unsigned long flags;
-	raw_local_irq_save(flags);
+	local_irq_save(flags);
 	for (start &= PAGE_MASK; start < end; start += PAGE_SIZE) {
 		unsigned long d = (start | current->active_mm->context);
 		asm volatile ("clrtlb %0, %1\n" :: "r"(-1), "r"(d) : "memory");
 	}
-	raw_local_irq_restore(flags);
+	local_irq_restore(flags);
 }
 
 static inline void local_flush_tlb_mm (struct mm_struct *mm) {
 	unsigned long flags;
-	raw_local_irq_save(flags);
+	local_irq_save(flags);
 	unsigned long context = mm->context;
 	unsigned long sz = (pu32_tlb_size() << PAGE_SHIFT);
 	do asm volatile ("clrtlb %0, %1\n" :: "r"(PAGE_SIZE-1), "r"((sz -= PAGE_SIZE) | context) : "memory");
 		while (sz);
-	raw_local_irq_restore(flags);
+	local_irq_restore(flags);
 }
 
 #define flush_tlb_all			local_flush_tlb_all
