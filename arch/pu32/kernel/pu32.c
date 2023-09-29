@@ -54,7 +54,6 @@ void pu32_save_syscall_retval (
 // Implemented in kernel/entry.S .
 void ret_from_syscall (void);
 void ret_from_exception (void);
-void ret_from_fault (void);
 
 // Save pu32-usermode registers and pu32_pt_regs_which to struct thread_info.
 void save_pu32umode_regs (
@@ -598,7 +597,7 @@ static void pu32sysrethdlr_sysOpIntr (unsigned long sysopcode) {
 			// Execute do_fault(pu32_ti_pt_regs(ti)->regs.pc, pu32SysOpIntr)
 			asm volatile ("setugpr %%1, %0\n" :: "r"(pu32_ti_pt_regs(ti)->regs.pc) : "memory");
 			asm volatile ("setugpr %%2, %0\n" :: "r"(pu32SysOpIntr) : "memory");
-			asm volatile ("setugpr %%rp, %0\n" :: "r"(ret_from_fault) : "memory");
+			asm volatile ("setugpr %%rp, %0\n" :: "r"(ret_from_exception) : "memory");
 			asm volatile ("setuip %0\n" :: "r"(do_fault) : "memory");
 			struct mm_struct *mm = tsk->active_mm;
 			asm volatile (
@@ -704,7 +703,7 @@ static void pu32sysrethdlr_faultIntr (pu32FaultReason faultreason, unsigned long
 	// Execute do_fault(faultaddr, faultreason)
 	asm volatile ("setugpr %%1, %0\n" :: "r"(faultaddr) : "memory");
 	asm volatile ("setugpr %%2, %0\n" :: "r"(faultreason) : "memory");
-	asm volatile ("setugpr %%rp, %0\n" :: "r"(ret_from_fault) : "memory");
+	asm volatile ("setugpr %%rp, %0\n" :: "r"(ret_from_exception) : "memory");
 	asm volatile ("setuip %0\n" :: "r"(do_fault) : "memory");
 	struct mm_struct *mm = tsk->active_mm;
 	asm volatile (

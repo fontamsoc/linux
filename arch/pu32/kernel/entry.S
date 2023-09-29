@@ -10,10 +10,6 @@
 
 __REF
 
-GLOBAL(ret_from_fault)
-	rli %sr, pu32_local_irq_disable
-	rli %rp, ret_from_exception
-	j %sr
 GLOBAL(ret_from_syscall)
 	# %1 has syscall return value.
 	rli %sr, pu32_save_syscall_retval
@@ -39,7 +35,7 @@ GLOBAL(ret_from_exception)
 	rli %sr, 0f
 	jz %2, %sr
 	rli %sr, schedule
-	rli %rp, ret_from_fault
+	rli %rp, ret_from_exception
 	j %sr
 	0: # Handle (_TIF_SIGPENDING | _TIF_NOTIFY_RESUME).
 	# %1 has thread_info.flags.
@@ -80,7 +76,7 @@ sysret:
 GLOBAL(ret_from_fork)
 	# %1 is expected to have struct task_struct *prev.
 	rli %sr, schedule_tail
-	rli %rp, ret_from_fault
+	rli %rp, ret_from_exception
 	j %sr
 
 GLOBAL(ret_from_kernel_thread)
@@ -95,7 +91,7 @@ GLOBAL(ret_from_kernel_thread)
 	ld32 %sr, %sr
 	inc %1, TASK_TI_KR1
 	ld32 %1, %1
-	rli %rp, ret_from_fault
+	rli %rp, ret_from_exception
 	j %sr
 
 GLOBAL(__switch_to)
