@@ -160,7 +160,8 @@ static blk_status_t pu32hdd_queue_rq (
 	const struct blk_mq_queue_data* bd) {
 	struct request *rq = bd->rq;
 	struct pu32hdd_device *dev = rq->q->queuedata;
-	if (!spin_trylock (&dev->lock))
+	unsigned long flags;
+	if (!spin_trylock_irqsave (&dev->lock, flags))
 		return BLK_STS_DEV_RESOURCE;
 	blk_status_t status = BLK_STS_OK;
 	blk_mq_start_request(rq);
@@ -168,7 +169,7 @@ static blk_status_t pu32hdd_queue_rq (
 		status = pu32hdd_do_request(rq);
 	} while (blk_update_request(rq, status, blk_rq_cur_bytes(rq)));
 	__blk_mq_end_request (rq, status);
-	spin_unlock (&dev->lock);
+	spin_unlock_irqrestore (&dev->lock, flags);
 	return BLK_STS_OK;
 }
 
@@ -201,6 +202,7 @@ unsigned long hwdrvblkdev_init_ (void) {
 		goto out;
 	pu32hdd_ishw = 1;
 	pu32hdd_param_hw_en = 1;
+	#if 0 /* disable use of interrupts since pu32hdd_queue_rq() disable irq */
 	if (hwdrvdevtbl_dev.intridx >= 0) {
 		int ret = request_irq (
 			hwdrvdevtbl_dev.intridx, pu32hdd_isr,
@@ -215,6 +217,7 @@ unsigned long hwdrvblkdev_init_ (void) {
 			hwdrvintctrl_ena (pu32hdd_irq, 0);
 		}
 	}
+	#endif
 	hwdrvblkdev_dev.addr = hwdrvdevtbl_dev.addr;
 	if (!hwdrvblkdev_init (&hwdrvblkdev_dev, 0))
 		goto out_free_irq;
