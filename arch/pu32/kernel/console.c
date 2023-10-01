@@ -38,8 +38,7 @@ static LIST_HEAD(pu32tty_devs);
 
 extern unsigned long pu32_ishw;
 
-static void pu32tty_write (
-	struct console *con, const char *s, unsigned n) {
+static void pu32tty_write (struct console *con, const char *s, unsigned n) {
 	unsigned long i;
 	pu32tty_dev_t *dev = container_of(con, pu32tty_dev_t, console);
 	if (pu32_ishw) {
@@ -51,17 +50,8 @@ static void pu32tty_write (
 	}
 }
 
-static struct tty_driver *pu32tty_driver;
-
-static struct tty_driver * pu32tty_device (
-	struct console *con, int *idx) {
-	*idx = con->index;
-	return pu32tty_driver;
-}
-
-static void pu32tty_poll (struct timer_list *timer) {
+static void pu32tty_read (pu32tty_dev_t *dev) {
 	unsigned char c[PU32TTY_HWBUFSZ];
-	pu32tty_dev_t *dev = container_of(timer, pu32tty_dev_t, timer);
 	unsigned long hwchardev_read (void) {
 		if (pu32_ishw)
 			return hwdrvchar_read (&dev->hw, &c, PU32TTY_HWBUFSZ);
@@ -75,6 +65,11 @@ static void pu32tty_poll (struct timer_list *timer) {
 	}
 	if (nn)
 		tty_flip_buffer_push(&dev->port);
+}
+
+static void pu32tty_poll (struct timer_list *timer) {
+	pu32tty_dev_t *dev = container_of(timer, pu32tty_dev_t, timer);
+	pu32tty_read(dev);
 	if (dev->irq != -1) {
 		if (pu32_ishw)
 			hwdrvchar_interrupt (&dev->hw, 1); // Resume using interrupt instead.
@@ -84,22 +79,9 @@ static void pu32tty_poll (struct timer_list *timer) {
 
 static void pu32tty_work (struct work_struct *work) {
 	pu32tty_dev_t *dev = container_of(work, pu32tty_dev_t, work);
-	unsigned char c[PU32TTY_HWBUFSZ];
-	unsigned long hwchardev_read (void) {
-		if (pu32_ishw)
-			return hwdrvchar_read (&dev->hw, &c, PU32TTY_HWBUFSZ);
-		else
-			return pu32sysread (PU32_BIOS_FD_STDIN, &c, 1);
-	}
-	unsigned long n, nn = 0;
-	while ((n = hwchardev_read())) {
-		tty_insert_flip_string (&dev->port, (unsigned char *)&c, n);
-		nn |= n;
-	}
-	if (nn)
-		tty_flip_buffer_push(&dev->port);
+	pu32tty_read(dev);
 	static unsigned long expires = 0;
-	if (dev->irq != -1 && jiffies >= expires) {
+	if (dev->irq != -1 && jiffies > expires) {
 		expires = (jiffies + PU32TTY_ISR_DELAY);
 		if (pu32_ishw)
 			hwdrvchar_interrupt (&dev->hw, 1);
@@ -219,6 +201,14 @@ static int pu32tty_get_serial (struct tty_struct *tty, struct serial_struct *ss)
 	ss->custom_divisor = 1;
 	tty_unlock(tty);
 	return 0;
+}
+
+static struct tty_driver *pu32tty_driver;
+
+static struct tty_driver * pu32tty_device (
+	struct console *con, int *idx) {
+	*idx = con->index;
+	return pu32tty_driver;
 }
 
 static const struct tty_port_operations pu32tty_port_ops = {
