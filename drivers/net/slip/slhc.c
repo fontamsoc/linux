@@ -459,13 +459,8 @@ found:
 		*cpp = ocp;
 		*cp++ = changes;
 	}
-#ifdef __PU32__ /* To prevent D-AlignFault. */
-	*cp++ = (char)(csum&0xff);
-	*cp++ = (char)((csum>>8)&0xff);
-#else
-	*(__sum16 *)cp = csum;
+	put_unaligned(csum, (__sum16 *)cp);
 	cp += 2;
-#endif
 /* deltaS is now the size of the change section of the compressed header */
 	memcpy(cp,new_seq,deltaS);	/* Write list of deltas */
 	memcpy(cp+deltaS,icp+hlen,isize-hlen);
@@ -539,11 +534,7 @@ slhc_uncompress(struct slcompress *comp, unsigned char *icp, int isize)
 	thp = &cs->cs_tcp;
 	ip = &cs->cs_ip;
 
-#ifdef __PU32__ /* To prevent D-AlignFault. */
-	thp->check = (((__sum16)*cp)|(((__sum16)*(cp+1))<<8));
-#else
-	thp->check = *(__sum16 *)cp;
-#endif
+	thp->check = get_unaligned((__sum16 *)cp);
 	cp += 2;
 
 	thp->psh = (changes & TCP_PUSH_BIT) ? 1 : 0;
