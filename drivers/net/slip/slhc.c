@@ -464,8 +464,8 @@ found:
 	*cp++ = (char)((csum>>8)&0xff);
 #else
 	*(__sum16 *)cp = csum;
-#endif
 	cp += 2;
+#endif
 /* deltaS is now the size of the change section of the compressed header */
 	memcpy(cp,new_seq,deltaS);	/* Write list of deltas */
 	memcpy(cp+deltaS,icp+hlen,isize-hlen);
