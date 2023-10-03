@@ -96,7 +96,7 @@ static inline void __user *get_sigframe (
 	size_t framesize) {
 	unsigned long sp = regs->sp;
 	if (on_sig_stack(sp) && !(on_sig_stack(sp - framesize)))
-		return (void __user __force *)0;
+		return (void __user __force *)(-1UL);
 	// This is the X/Open sanctioned signal stack switching.
 	sp = sigsp(sp, ksig) - framesize;
 	return (void __user *)arch_align_stack(sp);
@@ -154,7 +154,8 @@ static void do_signal (void) {
 
 	unsigned long in_syscall = (
 		(pu32regs->faultreason == pu32SysOpIntr) &&
-		(pu32regs->sysopcode & 0xff) == 0x01);
+		((pu32regs->sysopcode & 0xff) == 0x01) &&
+		pu32_ret_to_userspace(current_thread_info()));
 
 	struct pt_regs *regs = &pu32regs->regs;
 
