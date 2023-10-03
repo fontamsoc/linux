@@ -12,6 +12,8 @@ static void dump_trace (
 	unsigned long *eos = (unsigned long *)end_of_stack(tsk);
 
 	unsigned long ksp = task_thread_info(tsk)->ksp;
+	if (ksp == (unsigned long)eos)
+		return;
 	unsigned long *start = (unsigned long *)(ksp + sizeof(struct pu32_pt_regs));
 	unsigned long *end = (unsigned long *)((ksp & ~(THREAD_SIZE - 1)) +
 		((struct pu32_pt_regs *)ksp)->prev_ksp_offset);
