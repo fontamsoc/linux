@@ -4,7 +4,9 @@
 #ifndef __ASM_PU32_BARRIER_H
 #define __ASM_PU32_BARRIER_H
 
+#ifdef CONFIG_SMP
 #define mb() asm volatile ("dcacherst\n" ::: "memory")
+#endif
 
 #include <asm-generic/barrier.h>
 
