@@ -31,18 +31,18 @@ volatile unsigned int cpu_up_arg;
 extern unsigned long pu32_ishw;
 
 static unsigned long pu32_send_ipi (unsigned int cpu) {
-		unsigned long irqdst;
-		if (pu32_ishw) {
-			irqdst = hwdrvintctrl_int(cpu);
-		} else {
-			// Discard any data currently buffered in PU32_BIOS_FD_INTCTRLDEV.
-			while (pu32sysread (PU32_BIOS_FD_INTCTRLDEV, &irqdst, sizeof(unsigned long)));
-			// Send IPI to cpu.
-			pu32syswrite (PU32_BIOS_FD_INTCTRLDEV, (void *)&cpu, sizeof(unsigned long));
-			// Read IPI request response.
-			pu32sysread (PU32_BIOS_FD_INTCTRLDEV, (void *)&irqdst, sizeof(unsigned long));
-		}
-		return irqdst;
+	unsigned long irqdst;
+	if (pu32_ishw) {
+		irqdst = hwdrvintctrl_int(cpu);
+	} else {
+		// Discard any data currently buffered in PU32_BIOS_FD_INTCTRLDEV.
+		while (pu32sysread (PU32_BIOS_FD_INTCTRLDEV, &irqdst, sizeof(unsigned long)));
+		// Send IPI to cpu.
+		pu32syswrite (PU32_BIOS_FD_INTCTRLDEV, (void *)&cpu, sizeof(unsigned long));
+		// Read IPI request response.
+		pu32sysread (PU32_BIOS_FD_INTCTRLDEV, (void *)&irqdst, sizeof(unsigned long));
+	}
+	return irqdst;
 }
 
 // Hold stack address to be used by _inc_cpu_up_arg().
@@ -193,27 +193,24 @@ static irqreturn_t handle_ipi (int irq, void *dev) {
 		++stats[IPI_EMPTY];
 		return IRQ_HANDLED;
 	}
-	do {
-		if (ops & (1 << IPI_EMPTY)) {
-			BUG();
-		}
-		if (ops & (1 << IPI_RESCHEDULE)) {
-			++stats[IPI_RESCHEDULE];
-			scheduler_ipi();
-		}
-		if (ops & (1 << IPI_CALL_FUNC)) {
-			++stats[IPI_CALL_FUNC];
-			generic_smp_call_function_interrupt();
-		}
-		#ifdef CONFIG_IRQ_WORK
-		if (ops & (1 << IPI_IRQ_WORK)) {
-			++stats[IPI_IRQ_WORK];
-			irq_work_run();
-		}
-		#endif
-		BUG_ON((ops >> IPI_MAX) != 0);
-		ops = xchg(&ipi_data[raw_smp_processor_id()].bits, 0);
-	} while (ops);
+	if (ops & (1 << IPI_EMPTY)) {
+		BUG();
+	}
+	if (ops & (1 << IPI_RESCHEDULE)) {
+		++stats[IPI_RESCHEDULE];
+		scheduler_ipi();
+	}
+	if (ops & (1 << IPI_CALL_FUNC)) {
+		++stats[IPI_CALL_FUNC];
+		generic_smp_call_function_interrupt();
+	}
+	#ifdef CONFIG_IRQ_WORK
+	if (ops & (1 << IPI_IRQ_WORK)) {
+		++stats[IPI_IRQ_WORK];
+		irq_work_run();
+	}
+	#endif
+	BUG_ON((ops >> IPI_MAX) != 0);
 	return IRQ_HANDLED;
 }
 
@@ -221,9 +218,15 @@ static void ipi_msg (const struct cpumask *mask, enum ipi_msg_type msg_id) {
 	unsigned long flags;
 	local_irq_save(flags);
 	unsigned int cpu;
-	for_each_cpu(cpu, mask)
-		__set_bit(msg_id, &ipi_data[cpu].bits);
-	smp_mb();
+	for_each_cpu(cpu, mask) {
+		// Atomically write new msg bit (in case others are writing too),
+		// and read back old value
+		unsigned long old, new;
+		do {
+			new = old = ipi_data[cpu].bits;
+			new |= (1u << msg_id);
+		} while (cmpxchg(&ipi_data[cpu].bits, old, new) != old);
+	}
 	for_each_cpu(cpu, mask) {
 		unsigned long irqdst;
 		do {
