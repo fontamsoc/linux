@@ -8,6 +8,7 @@
 #include <linux/sched/task.h>
 
 #include <asm/extable.h>
+#include <asm/tlbflush.h>
 
 #include <pu32.h>
 
@@ -221,6 +222,9 @@ vmalloc_fault:;
 	pmd_t *pmd = pmd_offset((pud_t *)pgd, addr); // There is no pmd; this does pmd = pgd.
 	set_pmd(pmd, *pmd_k);
 
+	#ifdef CONFIG_SMP
+	flush_tlb_page(NULL, addr);
+	#else
 	asm volatile (
 		"settlb %0, %1\n"
 		:: "r"(pte_val(pte_k) & ~(/* Modify only either the itlb or dtlb */
@@ -229,6 +233,7 @@ vmalloc_fault:;
 				_PAGE_EXECUTABLE)),
 			"r"((addr&PAGE_MASK)|active_mm->context[raw_smp_processor_id()])
 		: "memory");
+	#endif
 
 	ret = 1;
 

@@ -483,8 +483,6 @@ static void pu32sysrethdlr_sysOpIntr (unsigned long sysopcode) {
 					#ifdef CONFIG_SMP
 					if (next_ti->last_cpu != raw_smp_processor_id()) {
 						next_ti->last_cpu = raw_smp_processor_id();
-						smp_mb();
-						local_flush_tlb_mm(next_mm);
 					}
 					#endif
 
@@ -1029,6 +1027,8 @@ void pu32ctxswitchhdlr (void) {
 	pu32hwflags[raw_smp_processor_id()] = hwflags;
 	pu32irqflags[raw_smp_processor_id()] = ARCH_IRQ_ENABLED;
 
+	local_flush_tlb_all();
+
 	struct mm_struct *mm = tsk->active_mm;
 	asm volatile (
 		"setugpr %%tp, %%tp\n"
@@ -1059,8 +1059,6 @@ void pu32ctxswitchhdlr (void) {
 		asm volatile ("cpy %%sp, %0\n" :: "r"(nsp));
 		asm volatile ("cpy %%fp, %0\n" :: "r"(kmode_stack + (ofp - pu32_stack_top_osp)));
 	}
-
-	local_flush_tlb_all();
 
 	if (pu32_ishw) // Enable core to receive device interrupts.
 		hwdrvintctrl_ack(raw_smp_processor_id(), 1);

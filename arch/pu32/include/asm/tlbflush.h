@@ -6,32 +6,6 @@
 
 #ifndef __ASSEMBLY__
 
-// TLB Management
-// ==============
-//
-// The TLB specific code is expected to perform whatever tests
-// it needs to determine if it should invalidate the TLB for each call.
-// Start addresses are inclusive and end addresses are exclusive;
-// it is safe to round these addresses down.
-//
-// flush_tlb_all()
-// 	Invalidate the entire TLB.
-//
-// flush_tlb_mm(mm)
-// 	Invalidate all TLB entries in a particular address space.
-// 	- mm:		mm_struct describing address space
-//
-// flush_tlb_range(vma,start,end)
-// 	Invalidate a range of TLB entries in the specified address space.
-// 	- vma:		vma_struct describing address range
-// 	- start:	start address (may not be aligned)
-// 	- end:		end address (exclusive, may not be aligned)
-//
-// flush_tlb_page(vma,addr)
-// 	Invalidate the specified page in the specified address range.
-// 	- vma:		vma_struct describing address range
-// 	- addr:		virtual address (may not be aligned)
-
 #include <asm/thread_info.h>
 #include <pu32.h>
 
@@ -51,8 +25,7 @@ static inline void pu32_tlb_update (struct pu32tlbentry tlbentry) {
 	asm volatile ("settlb %0, %1\n" :: "r"(tlbentry.d1), "r"(tlbentry.d2) : "memory");
 }
 
-static inline void local_flush_tlb_page (
-	struct vm_area_struct *vma, unsigned long addr) {
+static inline void local_flush_tlb_page (struct vm_area_struct *vma, unsigned long addr) {
 	unsigned long d = ((addr & PAGE_MASK) | current->active_mm->context[raw_smp_processor_id()]);
 	asm volatile ("clrtlb %0, %1\n" :: "r"(-1), "r"(d) : "memory");
 }
@@ -66,19 +39,6 @@ static inline void local_flush_tlb_all (void) {
 	local_irq_restore(flags);
 }
 
-static inline void local_flush_tlb_range (
-	struct vm_area_struct *vma,
-	unsigned long start,
-	unsigned long end) {
-	unsigned long flags;
-	local_irq_save(flags);
-	for (start &= PAGE_MASK; start < end; start += PAGE_SIZE) {
-		unsigned long d = (start | current->active_mm->context[raw_smp_processor_id()]);
-		asm volatile ("clrtlb %0, %1\n" :: "r"(-1), "r"(d) : "memory");
-	}
-	local_irq_restore(flags);
-}
-
 static inline void local_flush_tlb_mm (struct mm_struct *mm) {
 	unsigned long flags;
 	local_irq_save(flags);
@@ -89,11 +49,36 @@ static inline void local_flush_tlb_mm (struct mm_struct *mm) {
 	local_irq_restore(flags);
 }
 
+// start address is inclusive; end address is exclusive;
+// it is safe to round those addresses down.
+static inline void local_flush_tlb_range (
+	struct vm_area_struct *vma, unsigned long start, unsigned long end) {
+	unsigned long flags;
+	local_irq_save(flags);
+	for (start &= PAGE_MASK; start < end; start += PAGE_SIZE) {
+		unsigned long d = (start | current->active_mm->context[raw_smp_processor_id()]);
+		asm volatile ("clrtlb %0, %1\n" :: "r"(-1), "r"(d) : "memory");
+	}
+	local_irq_restore(flags);
+}
+
+static inline void local_flush_tlb_kernel_range (unsigned long start, unsigned long end) {
+	local_flush_tlb_range(((struct vm_area_struct *){0}), start, end);
+}
+
+#ifdef CONFIG_SMP
+extern void flush_tlb_page (struct vm_area_struct *vma, unsigned long addr);
+extern void flush_tlb_all (void);
+extern void flush_tlb_mm (struct mm_struct *mm);
+extern void flush_tlb_range (struct vm_area_struct *vma, unsigned long start, unsigned long end);
+extern void flush_tlb_kernel_range (unsigned long start, unsigned long end);
+#else
+#define flush_tlb_page              local_flush_tlb_page
 #define flush_tlb_all               local_flush_tlb_all
 #define flush_tlb_mm                local_flush_tlb_mm
 #define flush_tlb_range             local_flush_tlb_range
-#define flush_tlb_page              local_flush_tlb_page
 #define flush_tlb_kernel_range(s,e) local_flush_tlb_range(((struct vm_area_struct *){0}), s, e)
+#endif
 
 #endif
 

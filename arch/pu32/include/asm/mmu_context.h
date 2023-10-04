@@ -28,19 +28,18 @@ static inline void switch_mm (
 	unsigned long flags;
 	local_irq_save(flags);
 
-	smp_mb();
-
 	unsigned long context = next->context[raw_smp_processor_id()];
 	if (context != PU32_NO_CONTEXT)
 		goto done;
 
 	context = get_mmu_context();
-	if (context != PU32_NO_CONTEXT)
+	if (context != PU32_NO_CONTEXT) {
 		next->context[raw_smp_processor_id()] = context;
+		cpumask_set_cpu(raw_smp_processor_id(), mm_cpumask(next));
+	} else
+		local_flush_tlb_mm(next);
 
 	done:
-
-	local_flush_tlb_mm(next);
 
 	asm volatile (
 		"cpy %%sr, %1\n"
@@ -60,17 +59,17 @@ void put_mmu_context (unsigned long context, unsigned long cpu);
 
 static inline void destroy_context (struct mm_struct *mm) {
 
+	flush_tlb_mm(mm);
+
 	unsigned long flags;
 	local_irq_save(flags);
 
 	int i;
-	for_each_possible_cpu(i) {
+	for_each_cpu(i, mm_cpumask(mm)) {
 		unsigned long context = mm->context[i];
 		if (context != PU32_NO_CONTEXT)
 			put_mmu_context(context, i);
 	}
-
-	smp_mb();
 
 	local_irq_restore(flags);
 }
