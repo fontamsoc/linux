@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // (c) William Fonkou Tambe
 
-#ifdef CONFIG_SMP
-#include <linux/spinlock.h>
-#endif
-
 #include <asm/mmu_context.h>
 
 #define PU32_NR_ASIDS (1<<12)
