@@ -452,6 +452,9 @@ static void pu32sysrethdlr_sysOpIntr (unsigned long sysopcode) {
 						struct pt_regs *next_pt_regs = &pu32_next_ti_pt_regs->regs;
 						next_r1 = next_pt_regs->r1;
 						next_pc = next_pt_regs->pc;
+						if (next_faultreason == pu32SysOpIntr &&
+							(pu32_next_ti_pt_regs->sysopcode&0xff) == 0x02)
+							next_pc -= sizeof(uint16_t); // Returning from a brk instruction.
 					}
 
 					// Note that %1 and %pc are not restored.
