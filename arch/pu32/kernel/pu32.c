@@ -244,7 +244,7 @@ void restore_pu32umode_regs (struct thread_info *ti) {
 				//"ld32 %%sr, %0\n"
 				//"setugpr %%1, %%sr\n"
 
-				"inc8 %0, 4*2\n" // Increment by 8 since saving %1 is skipped.
+				"inc8 %0, 4*2\n" // Increment by 8 since restoring %1 is skipped.
 				"ld32 %%sr, %0\n"
 				"setugpr %%2, %%sr\n"
 
