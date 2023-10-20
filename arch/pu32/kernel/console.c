@@ -134,8 +134,9 @@ static void pu32tty_tty_ops_close (struct tty_struct *tty, struct file *filp) {
 		hwdrvintctrl_ena (dev->irq, 0);
 		hwdrvchar_interrupt (&dev->hw, 0);
 		free_irq (dev->irq, dev);
-	} else
-		del_timer_sync(&dev->timer);
+	}
+	del_timer_sync(&dev->timer);
+	flush_workqueue(pu32tty_wq);
 	tty_port_close(tty->port, tty, filp);
 }
 
@@ -157,13 +158,16 @@ static unsigned int pu32tty_chars_in_buffer (struct tty_struct *tty) {
 	return 0; // No buffer.
 }
 
-static void pu32tty_set_termios (struct tty_struct *tty, const struct ktermios * old) {
+static void pu32tty_set_termios (struct tty_struct *tty, const struct ktermios *old) {
 	pu32tty_dev_t *dev = container_of(tty->port, pu32tty_dev_t, port);
 	unsigned long baudrate = tty_termios_baud_rate(&tty->termios);
 	if (baudrate && baudrate != dev->baudrate) {
 		dev->baudrate = baudrate;
-		if (pu32_ishw)
+		if (pu32_ishw) {
 			hwdrvchar_init (&dev->hw, baudrate);
+			if (dev->irq != -1)
+				hwdrvchar_interrupt (&dev->hw, 1);
+		}
 	}
 }
 
@@ -179,8 +183,11 @@ static int pu32tty_set_serial (struct tty_struct *tty, struct serial_struct *ss)
 	tty_lock(tty);
 	if (baudrate && baudrate != dev->baudrate) {
 		dev->baudrate = baudrate;
-		if (pu32_ishw)
-			hwdrvchar_init (&dev->hw, dev->baudrate);
+		if (pu32_ishw) {
+			hwdrvchar_init (&dev->hw, baudrate);
+			if (dev->irq != -1)
+				hwdrvchar_interrupt (&dev->hw, 1);
+		}
 	}
 	tty_unlock(tty);
 
