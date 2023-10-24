@@ -82,7 +82,7 @@ void show_stack (struct task_struct *tsk, unsigned long *sp, const char *loglvl)
 	struct pu32_pt_regs *eos;
 	if (sp) {
 		eos = (struct pu32_pt_regs *)pu32_stack_bottom(sp);
-		printk ("%sstacktrace(0x%x):\n", loglvl, (unsigned)sp);
+		printk ("%sstacktrace(0x%08lx):\n", loglvl, (unsigned long)sp);
 		stacktrace (sp, (unsigned long *)eos, loglvl);
 	}
 	asm volatile ("cpy %0, %%sp\n" : "=r"(sp) :: "memory");
@@ -103,15 +103,15 @@ void show_stack (struct task_struct *tsk, unsigned long *sp, const char *loglvl)
 		if (is_current_ti && !user_mode(pu32_ti_pt_regs(ti))) {
 			asm volatile ("setkgpr %0, %%sp\n" : "=r"(sp) :: "memory");
 			if (pu32_stack_top(sp) != pu32_stack_top(ksp)) {
-				printk ("%s!!! stack_top(sp(0x%x)) != stack_top(ksp(0x%x)) !!!\n",
-					loglvl, (unsigned)sp, (unsigned)ksp);
+				printk ("%s!!! stack_top(sp(0x%08lx)) != stack_top(ksp(0x%08lx)) !!!\n",
+					loglvl, (unsigned long)sp, (unsigned long)ksp);
 				sp = (unsigned long *)ksp;
 			}
 		} else
 			sp = (unsigned long *)ksp;
 	} else if (pu32_stack_top(sp) != pu32_stack_top(ksp)) {
 		eos = (struct pu32_pt_regs *)pu32_stack_bottom(sp);
-		printk ("%sstacktrace(0x%x):\n", loglvl, (unsigned)sp);
+		printk ("%sstacktrace(0x%08lx):\n", loglvl, (unsigned long)sp);
 		stacktrace (sp, (unsigned long *)eos, loglvl);
 		sp = (unsigned long *)ksp;
 	}
@@ -120,22 +120,24 @@ void show_stack (struct task_struct *tsk, unsigned long *sp, const char *loglvl)
 		printk ("%sstacktrace:\n", loglvl);
 		stacktrace (sp, (unsigned long *)ksp, loglvl);
 	}
+	if (iskthread) {
+		// Unlike a kernel-thread, a user-thread would always have a saved context.
+		eos = eos-1;
+	}
 	while (1) {
-		if (iskthread) {
-			// Unlike a kernel-thread, a user-thread would always have a saved context.
-			if (ksp == (unsigned long)(eos-1))
-				break;
-		} else if (ksp == (unsigned long)eos)
+		if (ksp == (unsigned long)eos)
 			break;
 		struct pu32_pt_regs *ppr = (struct pu32_pt_regs *)ksp;
 		printk ("%s%s: %s\n", loglvl,
 			pu32faultreasonstr (ppr->faultreason, (ppr->regs.pc&1)),
 			pu32sysopcodestr (ppr->sysopcode));
 		__show_regs(&ppr->regs, loglvl);
+		unsigned long prev_ksp_offset = ((struct pu32_pt_regs *)ksp)->prev_ksp_offset;
+		if (!prev_ksp_offset)
+			break;
 		sp = (unsigned long *)(ksp + sizeof(struct pu32_pt_regs));
-		ksp = ((ksp & ~(THREAD_SIZE - 1)) +
-			((struct pu32_pt_regs *)ksp)->prev_ksp_offset);
-		printk ("%sstacktrace:\n", loglvl);
+		ksp = ((ksp & ~(THREAD_SIZE - 1)) + prev_ksp_offset);
+		printk ("%sstacktrace:ksp(0x%08lx):eos(0x%08lx)\n", loglvl, ksp, (unsigned long)eos);
 		stacktrace (sp, (unsigned long *)ksp, loglvl);
 	}
 	printk ("%s---- end:show_stack()\n", loglvl);
