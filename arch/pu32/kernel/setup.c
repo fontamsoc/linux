@@ -278,8 +278,6 @@ void __init setup_arch (char **cmdline_p) {
 
 void __init trap_init (void) {}
 
-#define DEVTBLADDR (0x200 /* By convention, the device table is located at 0x200 */)
-
 __attribute__((noreturn)) void __init pu32_start (char **argv, char **envp) {
 	// Adjust %ksl to enable caching throughout the kernel image memory range.
 	asm volatile ("setksl %0\n" :: "r"((void *)_end) : "memory");
@@ -320,13 +318,19 @@ __attribute__((noreturn)) void __init pu32_start (char **argv, char **envp) {
 		pu32_mem_end_high = pu32_mem_start + (hwdrvdevtbl_dev.mapsz * sizeof(unsigned long));
 
 		#ifdef CONFIG_PROC_FS
-		c_info_rcache = 1 /* RAMCACHESZ */;
-		asm volatile ("ldst %0, %1\n" : "+r"(c_info_rcache) : "r"(DEVTBLADDR) : "memory");
+		c_info_rcache = (HWDRVDEVTBLADDR+(1*__SIZEOF_POINTER__))/* RAMCACHESZ */;
+		__asm__ __volatile__ (
+			"li8 %%sr, 4\n" /* RDSELINFO */
+			"stv %%sr, %0\n"
+			"ldv %0, %0\n"
+			: "+r" (c_info_rcache)
+			:: "memory");
 		c_info_rcache *= sizeof(unsigned long);
 		c_info_rcache /= 1024;
 		#endif
 
 	} else {
+
 		char *e = getenv("MEMSTARTADDR", envp); // Memory start.
 		if (e && kstrtoul(e, 0, &pu32_mem_start) == 0)
 			/*pu32printf("MEMSTARTADDR\t:0x%x\n", pu32_mem_start)*/;
