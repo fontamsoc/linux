@@ -50,40 +50,58 @@ void *uintcpy2_8uint_1uint (void *dst, const void *src, unsigned long cnt8, unsi
 	"uintcpy2_8uint_1uint:\n"
 
 	"jz %3, %rp\n"
-	"_uintcpy28: rli %sr, 0f; 0:\n"
+	"_uintcpy28: 0:\n"
+
 	"inc8 %2, -"__stringify(__SIZEOF_POINTER__)"\n"
 	"ld %5, %2\n"
-	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
-	"st %5, %1\n"
+
 	"inc8 %2, -"__stringify(__SIZEOF_POINTER__)"\n"
-	"ld %5, %2\n"
-	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
-	"st %5, %1\n"
+	"ld %6, %2\n"
+
 	"inc8 %2, -"__stringify(__SIZEOF_POINTER__)"\n"
-	"ld %5, %2\n"
-	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
-	"st %5, %1\n"
+	"ld %7, %2\n"
+
 	"inc8 %2, -"__stringify(__SIZEOF_POINTER__)"\n"
-	"ld %5, %2\n"
-	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
-	"st %5, %1\n"
+	"ld %8, %2\n"
+
 	"inc8 %2, -"__stringify(__SIZEOF_POINTER__)"\n"
-	"ld %5, %2\n"
-	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
-	"st %5, %1\n"
+	"ld %9, %2\n"
+
 	"inc8 %2, -"__stringify(__SIZEOF_POINTER__)"\n"
-	"ld %5, %2\n"
-	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
-	"st %5, %1\n"
+	"ld %11, %2\n"
+
 	"inc8 %2, -"__stringify(__SIZEOF_POINTER__)"\n"
-	"ld %5, %2\n"
-	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
-	"st %5, %1\n"
+	"ld %12, %2\n"
+
 	"inc8 %2, -"__stringify(__SIZEOF_POINTER__)"\n"
-	"ld %5, %2\n"
+	"ld %13, %2\n"
+
 	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
 	"st %5, %1\n"
+
+	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
+	"st %6, %1\n"
+
+	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
+	"st %7, %1\n"
+
+	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
+	"st %8, %1\n"
+
+	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
+	"st %9, %1\n"
+
+	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
+	"st %11, %1\n"
+
+	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
+	"st %12, %1\n"
+
+	"inc8 %1, -"__stringify(__SIZEOF_POINTER__)"\n"
+	"st %13, %1\n"
+
 	"inc8 %3, -8*"__stringify(__SIZEOF_POINTER__)"\n"
+	"rli %sr, 0b\n"
 	"jnz %3, %sr\n"
 	"jz %4, %rp\n"
 	"cpy %3, %4\n"
@@ -146,40 +164,58 @@ void *u8cpy2_8u8_1u8 (void *dst, const void *src, unsigned long cnt8, unsigned l
 	"u8cpy2_8u8_1u8:\n"
 
 	"jz %3, %rp\n"
-	"rli %sr, 0f; 0:\n"
+	"0:\n"
+
 	"inc8 %2, -1\n"
 	"ld8 %5, %2\n"
-	"inc8 %1, -1\n"
-	"st8 %5, %1\n"
+
 	"inc8 %2, -1\n"
-	"ld8 %5, %2\n"
-	"inc8 %1, -1\n"
-	"st8 %5, %1\n"
+	"ld8 %6, %2\n"
+
 	"inc8 %2, -1\n"
-	"ld8 %5, %2\n"
-	"inc8 %1, -1\n"
-	"st8 %5, %1\n"
+	"ld8 %7, %2\n"
+
 	"inc8 %2, -1\n"
-	"ld8 %5, %2\n"
-	"inc8 %1, -1\n"
-	"st8 %5, %1\n"
+	"ld8 %8, %2\n"
+
 	"inc8 %2, -1\n"
-	"ld8 %5, %2\n"
-	"inc8 %1, -1\n"
-	"st8 %5, %1\n"
+	"ld8 %9, %2\n"
+
 	"inc8 %2, -1\n"
-	"ld8 %5, %2\n"
-	"inc8 %1, -1\n"
-	"st8 %5, %1\n"
+	"ld8 %11, %2\n"
+
 	"inc8 %2, -1\n"
-	"ld8 %5, %2\n"
-	"inc8 %1, -1\n"
-	"st8 %5, %1\n"
+	"ld8 %12, %2\n"
+
 	"inc8 %2, -1\n"
-	"ld8 %5, %2\n"
+	"ld8 %13, %2\n"
+
 	"inc8 %1, -1\n"
 	"st8 %5, %1\n"
+
+	"inc8 %1, -1\n"
+	"st8 %6, %1\n"
+
+	"inc8 %1, -1\n"
+	"st8 %7, %1\n"
+
+	"inc8 %1, -1\n"
+	"st8 %8, %1\n"
+
+	"inc8 %1, -1\n"
+	"st8 %9, %1\n"
+
+	"inc8 %1, -1\n"
+	"st8 %11, %1\n"
+
+	"inc8 %1, -1\n"
+	"st8 %12, %1\n"
+
+	"inc8 %1, -1\n"
+	"st8 %13, %1\n"
+
 	"inc8 %3, -8*1\n"
+	"rli %sr, 0b\n"
 	"jnz %3, %sr\n"
 	"jz %4, %rp\n"
 	"cpy %3, %4\n"
